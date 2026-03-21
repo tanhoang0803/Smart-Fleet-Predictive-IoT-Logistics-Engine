@@ -4,11 +4,13 @@ on:
   push:
     branches: [main]
 
+# CD only runs after CI passes
 jobs:
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
     environment: production
+    # Require all CI jobs to pass before deploying
     needs: []
 
     steps:
@@ -17,17 +19,20 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
 
       - name: Run database migrations
+        if: ${{ secrets.SUPABASE_URL != '' }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          npm install -g supabase
+          # Install Supabase CLI via script (not npm)
+          curl -fsSL https://raw.githubusercontent.com/supabase/cli/main/install.sh | sh
           bash scripts/migrate.sh
 
       - name: Deploy backend to Render
+        if: ${{ secrets.RENDER_API_KEY != '' }}
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           RENDER_SERVICE_ID: ${{ secrets.RENDER_SERVICE_ID }}
@@ -39,6 +44,7 @@ jobs:
             -d '{"clearCache": false}'
 
       - name: Deploy frontend to Vercel
+        if: ${{ secrets.VERCEL_TOKEN != '' }}
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
@@ -48,6 +54,5 @@ jobs:
           cd frontend
           vercel --prod --token=$VERCEL_TOKEN
 
-      - name: Notify deployment success
-        if: success()
-        run: echo "Deployment complete — Smart-Fleet IoT is live."
+      - name: Deployment complete
+        run: echo "Smart-Fleet IoT deployment pipeline finished."
