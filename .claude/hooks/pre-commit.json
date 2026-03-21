@@ -1,0 +1,40 @@
+{
+  "description": "Smart-Fleet IoT pre-commit safety gates — TanQHoang © 2026",
+  "hooks": [
+    {
+      "id": "check-api-docs",
+      "description": "Block commit if a new controller route is added without a docs/api.md entry",
+      "command": "node scripts/hooks/check-api-docs.js",
+      "on": "pre-commit",
+      "blocking": true
+    },
+    {
+      "id": "check-env-example",
+      "description": "Block commit if a new process.env reference exists without a .env.example entry",
+      "command": "node scripts/hooks/check-env-example.js",
+      "on": "pre-commit",
+      "blocking": true
+    },
+    {
+      "id": "check-interval-citation",
+      "description": "Block commit if base interval values in maintenanceService.js change without a source comment",
+      "command": "node scripts/hooks/check-interval-citation.js",
+      "on": "pre-commit",
+      "blocking": true
+    },
+    {
+      "id": "check-docker-docs",
+      "description": "Block commit if docker-compose.yml changes without infrastructure/ documentation update",
+      "command": "node scripts/hooks/check-docker-docs.js",
+      "on": "pre-commit",
+      "blocking": true
+    },
+    {
+      "id": "no-console-log",
+      "description": "Block commit if console.log appears in backend src/ (use logger service)",
+      "command": "grep -rn 'console\\.log' backend/src/ && echo 'ERROR: Use logger service instead of console.log' && exit 1 || exit 0",
+      "on": "pre-commit",
+      "blocking": true
+    }
+  ]
+}

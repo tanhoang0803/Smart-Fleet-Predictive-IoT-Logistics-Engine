@@ -1,0 +1,88 @@
+version: '3.9'
+
+# Smart-Fleet IoT — Docker Compose
+# TanQHoang © 2026
+# NOTE: In production, do NOT expose ports directly. Use a reverse proxy (Nginx/Caddy).
+
+services:
+  backend:
+    build:
+      context: ../backend
+      dockerfile: ../infrastructure/backend.Dockerfile
+    container_name: smart-fleet-backend
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3001
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+      UPSTASH_REDIS_REST_URL: ${UPSTASH_REDIS_REST_URL}
+      UPSTASH_REDIS_REST_TOKEN: ${UPSTASH_REDIS_REST_TOKEN}
+      OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY}
+      OPENWEATHER_DEFAULT_LAT: ${OPENWEATHER_DEFAULT_LAT:-10.8231}
+      OPENWEATHER_DEFAULT_LON: ${OPENWEATHER_DEFAULT_LON:-106.6297}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID}
+      FIREBASE_CLIENT_EMAIL: ${FIREBASE_CLIENT_EMAIL}
+      FIREBASE_PRIVATE_KEY: ${FIREBASE_PRIVATE_KEY}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_ACCESS_EXPIRES_IN: ${JWT_ACCESS_EXPIRES_IN:-15m}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+    env_file:
+      - ../.env
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - smart-fleet-net
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: ../infrastructure/frontend.Dockerfile
+    container_name: smart-fleet-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - smart-fleet-net
+
+  # Local Redis for development only.
+  # Production uses Upstash Redis (remote) — this service is NOT used in production.
+  redis:
+    image: redis:7-alpine
+    container_name: smart-fleet-redis-dev
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 50mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - smart-fleet-net
+    profiles:
+      - dev  # Only starts with: docker-compose --profile dev up
+
+networks:
+  smart-fleet-net:
+    driver: bridge

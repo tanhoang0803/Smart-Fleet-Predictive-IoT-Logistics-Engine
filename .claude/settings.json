@@ -1,0 +1,41 @@
+{
+  "model": "claude-sonnet-4-6",
+  "project": "Smart-Fleet IoT | Predictive Maintenance Engine",
+  "developer": "TanQHoang © 2026",
+  "permissions": {
+    "allow": [
+      "Bash(npm install)",
+      "Bash(npm run *)",
+      "Bash(node *)",
+      "Bash(docker *)",
+      "Bash(bash scripts/*)",
+      "Bash(git status)",
+      "Bash(git diff)",
+      "Bash(git log)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ],
+    "deny": [
+      "Bash(git push --force *)",
+      "Bash(git reset --hard *)",
+      "Bash(rm -rf *)",
+      "Bash(DROP TABLE *)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const c=process.env.CLAUDE_TOOL_INPUT||''; if(c.includes('console.log')) { console.error('Hook: Use logger service instead of console.log'); process.exit(1); }\""
+          }
+        ]
+      }
+    ]
+  },
+  "env": {
+    "NODE_ENV": "development"
+  }
+}

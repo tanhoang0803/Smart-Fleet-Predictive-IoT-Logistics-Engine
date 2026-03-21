@@ -1,0 +1,55 @@
+# ============================================================
+# Smart-Fleet IoT — .gitignore
+# TanQHoang © 2026
+# ============================================================
+
+# --- Secrets (NEVER commit these) ---
+.env
+.env.local
+.env.production
+*.pem
+*.key
+
+# --- Dependencies ---
+node_modules/
+.pnp
+.pnp.js
+
+# --- Build outputs ---
+dist/
+build/
+.vite/
+
+# --- Test coverage ---
+coverage/
+*.lcov
+
+# --- Logs ---
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- Docker volumes ---
+.docker/
+docker-volumes/
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- Supabase local ---
+supabase/.temp/
+supabase/config.toml
+
+# --- Misc ---
+*.tgz
+.npm
