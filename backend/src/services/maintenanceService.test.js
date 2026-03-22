@@ -24,9 +24,17 @@ describe('calculateAdjustedInterval', () => {
     expect(result).toBe(2000);
   });
 
-  test('monsoon season (H=0.60) + E10 (F=0.90) + heavy load (L=0.80) → ~864 km', () => {
+  test('monsoon season (H=0.60) + E10 (F=0.90) + heavy load (L=0.80) → floor applies → 900 km', () => {
+    // 2000 × 0.60 × 0.90 × 0.80 = 864 → below MIN_MULTIPLIER_FLOOR (0.45)
+    // floor clamps to 2000 × 0.45 = 900
     const result = calculateAdjustedInterval('engine_oil', 2000, 0.60, 'E10', 0.80);
-    expect(result).toBe(864); // 2000 × 0.60 × 0.90 × 0.80
+    expect(result).toBe(900);
+  });
+
+  test('moderate conditions (H=0.80) + E10 (F=0.90) + mixed load (L=0.90) → 1296 km', () => {
+    // 2000 × 0.80 × 0.90 × 0.90 = 1296 → above floor, no clamping
+    const result = calculateAdjustedInterval('engine_oil', 2000, 0.80, 'E10', 0.90);
+    expect(result).toBe(1296);
   });
 
   test('spark plug is humidity-exempt — H multiplier not applied', () => {

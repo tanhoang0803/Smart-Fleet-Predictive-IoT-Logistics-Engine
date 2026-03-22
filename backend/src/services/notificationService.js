@@ -5,15 +5,20 @@ const admin = require('firebase-admin');
 const userModel = require('../models/userModel');
 const logger = require('../utils/logger');
 
-// Initialize Firebase Admin SDK exactly once
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
-    }),
-  });
+// Firebase Admin SDK — lazy initialization.
+// NOT initialized at module load to prevent crashes during testing
+// when FIREBASE_PRIVATE_KEY is a dummy value.
+function getFirebaseApp() {
+  if (!admin.apps.length) {
+    admin.initializeApp({
+      credential: admin.credential.cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+      }),
+    });
+  }
+  return admin;
 }
 
 const ALERT_COPY = {
@@ -53,7 +58,7 @@ const notificationService = {
     };
 
     try {
-      const response = await admin.messaging().send(message);
+      const response = await getFirebaseApp().messaging().send(message);
       logger.info(`FCM sent [${status}] for vehicle ${vehicle.id}, component ${component}. messageId: ${response}`);
     } catch (err) {
       logger.error(`FCM send error for vehicle ${vehicle.id}: ${err.message}`);
