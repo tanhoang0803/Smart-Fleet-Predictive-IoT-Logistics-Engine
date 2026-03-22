@@ -6,6 +6,8 @@
 **Stack:** React · Redux Toolkit · Node.js · Express · Supabase · Upstash Redis · Docker
 **Optimized for:** Honda Wave RSX · Ho Chi Minh City tropical climate · E10 fuel blend
 
+[![CI — Lint, Test & Build](https://github.com/tanhoang0803/Smart-Fleet-Predictive-IoT-Logistics-Engine/actions/workflows/ci-deploy.yml/badge.svg)](https://github.com/tanhoang0803/Smart-Fleet-Predictive-IoT-Logistics-Engine/actions/workflows/ci-deploy.yml)
+
 ---
 
 ## The Vision
@@ -186,7 +188,7 @@ smart-fleet-iot/
 ## Quick Start
 
 ### Prerequisites
-- Node.js 18+
+- Node.js 24+
 - Docker + Docker Compose
 - A Supabase project (free tier works)
 - An Upstash Redis database (free tier works)
@@ -195,8 +197,8 @@ smart-fleet-iot/
 ### 1. Clone and configure
 
 ```bash
-git clone https://github.com/your-username/smart-fleet-iot.git
-cd smart-fleet-iot
+git clone https://github.com/tanhoang0803/Smart-Fleet-Predictive-IoT-Logistics-Engine.git
+cd Smart-Fleet-Predictive-IoT-Logistics-Engine
 cp .env.example .env
 # Fill in your API keys in .env
 ```
@@ -317,6 +319,54 @@ Pre-commit hooks in `.claude/hooks/pre-commit.json` enforce:
 - [ ] Multi-vehicle fleet comparison dashboard
 - [ ] Export maintenance history as PDF service record
 - [ ] SMS alerts via Twilio as FCM fallback
+
+---
+
+## Test Suite
+
+The backend includes **18 unit tests** covering the core predictive engine, runnable with zero live API connections:
+
+```bash
+cd backend && npm test
+```
+
+| Test Group | Tests | Coverage |
+|---|---|---|
+| `getFuelMultiplier` | 5 tests | RON95, E10, E5, RON92, unknown fuel default |
+| `calculateAdjustedInterval` | 7 tests | Floor clamping, humidity-exempt components, fuel-exempt components |
+| `getAlertStatus` | 6 tests | NORMAL/WARNING/CRITICAL/OVERDUE thresholds + sustained humidity override |
+
+Key implementation notes:
+- `MIN_MULTIPLIER_FLOOR = 0.45` — prevents interval from dropping below 45% of base (e.g. monsoon + E10 + heavy load clamps to 900 km, not 864 km)
+- `spark_plug` is **humidity-exempt** — physical design resists moisture
+- `drive_chain` is **fuel-exempt** — chain wear is mechanical, not combustion-related
+- `CRITICAL` override triggers when humidity ≥ 85% sustained for ≥ 72 hours, regardless of mileage remaining
+
+---
+
+## CI/CD Pipeline
+
+### Continuous Integration (`.github/workflows/ci-deploy.yml`)
+
+Runs on every push/PR to `develop` or `main`:
+
+1. **Lint Backend** — ESLint via `backend/.eslintrc.js`
+2. **Lint Frontend** — ESLint via `frontend/.eslintrc.cjs`
+3. **Test Backend** — Jest 18 tests with dummy env vars (no live connections)
+4. **Test Frontend** — Vitest with `--run --passWithNoTests`
+5. **Docker Build** — Validates both Dockerfiles build successfully
+
+### Continuous Deployment (`.github/workflows/cd-deploy.yml`)
+
+Triggers on merge to `main`. Requires GitHub Secrets:
+
+| Secret | Purpose |
+|---|---|
+| `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | DB migrations via Supabase CLI |
+| `RENDER_API_KEY` / `RENDER_SERVICE_ID` | Backend deploy to Render |
+| `VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` | Frontend deploy to Vercel |
+
+All deploy steps are gated — if a secret is not set, that step is skipped safely.
 
 ---
 

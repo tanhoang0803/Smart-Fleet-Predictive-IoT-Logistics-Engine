@@ -25,8 +25,17 @@ bash scripts/setup.sh
 # Start local development (frontend + backend concurrently)
 bash scripts/dev.sh
 
-# Run predictive service unit tests
-node backend/src/services/predictiveService.test.js
+# Run backend unit tests (Jest, 18 tests)
+cd backend && npm test
+
+# Run frontend tests (Vitest)
+cd frontend && npm run test -- --run
+
+# Lint backend
+cd backend && npm run lint
+
+# Lint frontend
+cd frontend && npm run lint
 
 # Run DB migrations
 bash scripts/migrate.sh
@@ -205,8 +214,12 @@ App
 | `MaintenanceService` | `services/maintenanceService.js` | Core predictive logic, interval calculation |
 | `WeatherService` | `services/weatherService.js` | OpenWeather fetch + Redis cache layer |
 | `RouteService` | `services/routeService.js` | Google Maps Matrix API integration |
-| `NotificationService` | `services/notificationService.js` | FCM push notification dispatch |
+| `NotificationService` | `services/notificationService.js` | FCM push notification dispatch (lazy Firebase init) |
 | `AuthService` | `services/authService.js` | JWT sign/verify, Supabase auth bridge |
+
+### Firebase Initialization Rule
+
+`NotificationService` uses **lazy initialization** — `admin.initializeApp()` is called only when `sendAlert()` is first invoked, never at module load. This prevents Jest from crashing when importing the module with dummy `FIREBASE_PRIVATE_KEY` values in CI. Do NOT move the init call back to module top-level.
 
 ### Controller → Service → Model flow (strict)
 ```
@@ -335,11 +348,15 @@ The hook at `.claude/hooks/pre-commit.json` blocks commits that:
 
 ## 15. Code Quality Standards
 
-- **Linting:** ESLint with `eslint-config-airbnb-base` (backend), `eslint-config-airbnb` (frontend)
+- **Linting (backend):** ESLint via `backend/.eslintrc.js` — extends `eslint:recommended`, env: `node + jest`, `no-console: error`
+- **Linting (frontend):** ESLint via `frontend/.eslintrc.cjs` — extends `eslint:recommended + react/recommended + react-hooks/recommended`, `react/prop-types: off`
 - **Formatting:** Prettier — single quotes, 2-space indent, 100-char line width
-- **Testing:** Jest for backend unit tests, Vitest for frontend. Minimum coverage: services 80%, controllers 60%
+- **Testing:** Jest (`backend/`) for unit tests — 18 tests covering `maintenanceService.js`. Vitest (`frontend/`) for component tests.
+- **Coverage:** `collectCoverageFrom` scoped to `src/services/**/*.js` — no global thresholds enforced in CI
+- **Line endings:** `.gitattributes` enforces `eol=lf` for all source files (Windows-safe)
 - **Commits:** Conventional Commits format — `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`
 - **Branches:** `main` (production), `develop` (integration), `feat/*`, `fix/*`
+- **CI:** GitHub Actions (Node 24) — lint + test + Docker build on every push/PR to `develop`/`main`
 
 ---
 
@@ -352,4 +369,12 @@ The hook at `.claude/hooks/pre-commit.json` blocks commits that:
 
 ---
 
-*Last updated: 2026-03-21 | Authority: L1*
+## 17. Repository
+
+- **GitHub:** `https://github.com/tanhoang0803/Smart-Fleet-Predictive-IoT-Logistics-Engine`
+- **CI Status:** GitHub Actions — lint + test + Docker build (Node 24, ubuntu-latest)
+- **CD:** Auto-deploy to Render (backend) + Vercel (frontend) on merge to `main` (requires GitHub Secrets)
+
+---
+
+*Last updated: 2026-03-22 | Authority: L1*
