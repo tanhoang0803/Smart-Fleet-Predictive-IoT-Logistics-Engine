@@ -35,7 +35,7 @@ function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-sm bg-fleet-surface border border-fleet-border rounded-2xl p-8">
         <h1 className="text-2xl font-bold text-fleet-text mb-1">Smart-Fleet</h1>
         <p className="text-sm text-fleet-muted mb-6">Predictive Maintenance Engine</p>
@@ -73,6 +73,9 @@ function LoginPage() {
           No account? <a href="/register" className="text-fleet-accent hover:underline">Register</a>
         </p>
       </div>
+      <footer className="mt-6">
+        <p className="text-xs text-fleet-muted">Created by &copy; 2026 TanQHoang</p>
+      </footer>
     </div>
   );
 }
@@ -92,7 +95,7 @@ function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-sm bg-fleet-surface border border-fleet-border rounded-2xl p-8">
         <h1 className="text-2xl font-bold text-fleet-text mb-6">Create Account</h1>
 
@@ -121,6 +124,9 @@ function RegisterPage() {
           Have an account? <a href="/login" className="text-fleet-accent hover:underline">Sign in</a>
         </p>
       </div>
+      <footer className="mt-6">
+        <p className="text-xs text-fleet-muted">Created by &copy; 2026 TanQHoang</p>
+      </footer>
     </div>
   );
 }
