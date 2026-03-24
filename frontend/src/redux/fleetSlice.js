@@ -31,6 +31,15 @@ export const fetchVehicleStatus = createAsyncThunk('fleet/fetchStatus', async (v
   }
 });
 
+export const logMaintenance = createAsyncThunk('fleet/logMaintenance', async ({ vehicleId, component, mileageAtService, notes }, { rejectWithValue }) => {
+  try {
+    const { data } = await axiosClient.post('/maintenance/log', { vehicleId, component, mileageAtService, notes });
+    return data.data;
+  } catch (err) {
+    return rejectWithValue(err.response?.data?.error || { message: 'Failed to log maintenance.' });
+  }
+});
+
 export const updateMileage = createAsyncThunk('fleet/updateMileage', async ({ vehicleId, mileageCurrent }, { rejectWithValue }) => {
   try {
     const { data } = await axiosClient.patch(`/fleet/${vehicleId}/mileage`, { mileageCurrent });
@@ -86,6 +95,7 @@ const fleetSlice = createSlice({
 });
 
 export const { selectVehicle, clearError } = fleetSlice.actions;
+export { logMaintenance };
 export default fleetSlice.reducer;
 
 // ─── Selectors ────────────────────────────────────────────────────────────────
