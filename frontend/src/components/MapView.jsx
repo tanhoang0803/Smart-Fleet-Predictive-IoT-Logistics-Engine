@@ -96,6 +96,17 @@ export function MapView({ vehicleId, vehicle }) {
     }
   }
 
+  function resetToDefault() {
+    setOrigin('');
+    setDest('');
+    setRouteData(null);
+    setAccepted(false);
+    setError(null);
+    dispatch(setRouteLocation(null));
+    dispatch(fetchWeather({}));
+    dispatch(fetchForecast({}));
+  }
+
   async function handleOptimize(e) {
     e.preventDefault();
     setLoading(true);
@@ -113,20 +124,8 @@ export function MapView({ vehicleId, vehicle }) {
     }
   }
 
-  async function handleRefresh() {
-    setLoading(true);
-    setError(null);
-    setAccepted(false);
-    try {
-      const result = await optimize();
-      setRouteData(result);
-      updateWeatherForOrigin();
-      if (vehicleId) dispatch(fetchVehicleStatus(vehicleId));
-    } catch (err) {
-      setError(err.response?.data?.error?.message || err.message || 'Refresh failed.');
-    } finally {
-      setLoading(false);
-    }
+  function handleRefresh() {
+    resetToDefault();
   }
 
   async function handleAccept() {
@@ -136,8 +135,7 @@ export function MapView({ vehicleId, vehicle }) {
     try {
       await dispatch(updateMileage({ vehicleId, mileageCurrent: newMileage }));
       await dispatch(fetchVehicleStatus(vehicleId));
-      setAccepted(true);
-      setRouteData(null);
+      resetToDefault();
     } catch {
       setError('Failed to update mileage. Try again.');
     } finally {
