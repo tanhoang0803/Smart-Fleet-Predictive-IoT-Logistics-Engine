@@ -87,6 +87,15 @@ export function MapView({ vehicleId, vehicle }) {
     return data.data;
   }
 
+  function updateWeatherForOrigin() {
+    const [oLat, oLon] = origin.split(',').map(Number);
+    if (!isNaN(oLat) && !isNaN(oLon)) {
+      dispatch(setRouteLocation({ lat: oLat, lon: oLon }));
+      dispatch(fetchWeather({ lat: oLat, lon: oLon }));
+      dispatch(fetchForecast({ lat: oLat, lon: oLon }));
+    }
+  }
+
   async function handleOptimize(e) {
     e.preventDefault();
     setLoading(true);
@@ -95,6 +104,7 @@ export function MapView({ vehicleId, vehicle }) {
     try {
       const result = await optimize();
       setRouteData(result);
+      updateWeatherForOrigin();
       if (vehicleId) dispatch(fetchVehicleStatus(vehicleId));
     } catch (err) {
       setError(err.response?.data?.error?.message || err.message || 'Route optimization failed.');
@@ -110,6 +120,7 @@ export function MapView({ vehicleId, vehicle }) {
     try {
       const result = await optimize();
       setRouteData(result);
+      updateWeatherForOrigin();
       if (vehicleId) dispatch(fetchVehicleStatus(vehicleId));
     } catch (err) {
       setError(err.response?.data?.error?.message || err.message || 'Refresh failed.');
@@ -125,13 +136,6 @@ export function MapView({ vehicleId, vehicle }) {
     try {
       await dispatch(updateMileage({ vehicleId, mileageCurrent: newMileage }));
       await dispatch(fetchVehicleStatus(vehicleId));
-
-      // Update WeatherWidget to show conditions at the route's origin location
-      const [oLat, oLon] = origin.split(',').map(Number);
-      dispatch(setRouteLocation({ lat: oLat, lon: oLon }));
-      dispatch(fetchWeather({ lat: oLat, lon: oLon }));
-      dispatch(fetchForecast({ lat: oLat, lon: oLon }));
-
       setAccepted(true);
       setRouteData(null);
     } catch {
