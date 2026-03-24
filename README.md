@@ -6,7 +6,7 @@
 **Stack:** React · Redux Toolkit · Node.js · Express · Supabase · Upstash Redis · Docker
 **Optimized for:** Honda Wave RSX · Ho Chi Minh City tropical climate · E10 fuel blend
 
-[![CI — Lint, Test & Build](https://github.com/tanhoang0803/Smart-Fleet-Predictive-IoT-Logistics-Engine/actions/workflows/ci-deploy.yml/badge.svg)](https://github.com/tanhoang0803/Smart-Fleet-Predictive-IoT-Logistics-Engine/actions/workflows/ci-deploy.yml)
+[![CI/CD — Lint, Test, Build & Deploy](https://github.com/tanhoang0803/Smart-Fleet-Predictive-IoT-Logistics-Engine/actions/workflows/ci-deploy.yml/badge.svg)](https://github.com/tanhoang0803/Smart-Fleet-Predictive-IoT-Logistics-Engine/actions/workflows/ci-deploy.yml)
 
 ---
 
@@ -20,30 +20,44 @@ The system transitions vehicle upkeep from a reactive model ("wait until somethi
 
 ---
 
-## Professional Features
+## Features
 
-### AI Environment Audit
-A specialized AI agent (`mechanic-pro`) applies dynamic wear multipliers to base service intervals. When humidity crosses 70% RH or rain persists for 72+ hours, the system automatically reduces maintenance thresholds — accounting for accelerated chain corrosion, lubricant breakdown, and air filter clogging specific to tropical conditions.
+### Live Weather-Aware Maintenance
+A dynamic multiplier system adjusts base service intervals in real time. When humidity crosses 70% RH, rain is detected, or temperature exceeds 37°C, the system automatically reduces maintenance thresholds — accounting for accelerated chain corrosion, lubricant breakdown, and air filter clogging specific to tropical conditions.
 
-### Enterprise State Machine
+### Enterprise Alert State Machine
 Maintenance tickets progress through a full lifecycle: `NORMAL → WARNING → CRITICAL → OVERDUE`. Each transition triggers appropriate notifications and UI state changes, preventing missed service events without alert fatigue.
 
+### Route Optimizer with Weather Integration
+Enter origin and destination coordinates to get:
+- **Route distance** (Haversine × 1.3 urban road factor — no API key needed)
+- **Duration estimate** at 25 km/h urban average
+- **Live weather** at origin (temperature, humidity, wind, visibility, pressure, sunrise/sunset)
+- **Weather-adjusted load factor** (reduced 10% if rain/storm detected)
+- **Adjusted fuel estimate** (corrected for humidity degradation)
+- **Maintenance warnings** ([CRITICAL] / [WARNING] / [INFO]) based on conditions
+- **Accept Route** automatically updates vehicle mileage and recalculates the full maintenance schedule
+
+### Location-Aware Weather Widget
+The Weather Conditions board updates immediately when a route is optimized — showing live conditions at the route's origin. Refresh/Accept resets it to the default Ho Chi Minh City view. Full display: city + date, large temperature + condition icon, 3×2 stats grid (humidity, wind speed, visibility, pressure, sunrise, sunset), wear multiplier, and 5-day forecast with icons.
+
 ### Latency Optimization via Redis Caching
-All OpenWeather and Google Maps API calls are intercepted by an Upstash Redis caching layer:
+All OpenWeather API calls are intercepted by an Upstash Redis caching layer:
 - Current weather: 30-minute TTL
 - 5-day forecast: 3-hour TTL
-- Route matrix results: 1-hour TTL
-
-This keeps the system within free-tier API limits at scale while delivering sub-50ms weather data responses.
+- Route results: 1-hour TTL
 
 ### Firebase FCM Push Notifications
-Critical and overdue maintenance alerts are delivered via Firebase Cloud Messaging — ensuring drivers receive push notifications even when the app is backgrounded. No alert is silently missed.
+Critical and overdue maintenance alerts are delivered via Firebase Cloud Messaging — ensuring drivers receive push notifications even when the app is backgrounded.
+
+### Session Persistence
+User sessions survive page refresh via `GET /auth/me` — no re-login required. The app shows a spinner until session state is confirmed before making auth routing decisions.
+
+### Zero-Cost Map Stack
+Map display uses **Leaflet + OpenStreetMap** (free, no API key). Route distance uses **Haversine formula** (zero dependency, always available). Google Maps is not required.
 
 ### Docker-Ready Infrastructure
-Zero-config local deployment via Docker Compose. A multi-stage Dockerfile builds the React frontend with Vite and serves it through Nginx. The backend runs on a lightweight Alpine Node image. Environment parity between development and production is guaranteed.
-
-### Google Maps Route Intelligence
-The Google Maps Distance Matrix API provides route-aware load factors. Long-haul routes with high load ratios apply additional wear multipliers, ensuring service intervals for delivery motorcycles are shorter than those used for light urban commuting.
+Zero-config local deployment via Docker Compose. A multi-stage Dockerfile builds the React frontend with Vite and serves it through Nginx. The backend runs on a lightweight Alpine Node image.
 
 ---
 
@@ -52,17 +66,16 @@ The Google Maps Distance Matrix API provides route-aware load factors. Long-haul
 | Layer | Technology | Purpose |
 |---|---|---|
 | Frontend | React 18 + Vite | Component-driven UI with fast HMR |
-| State | Redux Toolkit | Centralized fleet and auth state management |
+| State | Redux Toolkit | Centralized fleet, auth, and weather state |
 | Styling | Tailwind CSS | Utility-first responsive design |
 | Backend | Node.js + Express | RESTful API, business logic, 3rd-party orchestration |
 | Database | Supabase (PostgreSQL) | Persistent storage with Row Level Security |
 | Cache | Upstash Redis | Rate-limit protection, API response caching |
-| AI Engine | Gemini Flash | Conversational maintenance recommendations |
 | Weather | OpenWeather API | Real-time humidity, temperature, rain forecast |
-| Maps | Google Maps Matrix API | Route distance, load factor calculation |
+| Map Display | Leaflet + OpenStreetMap | Free interactive map, no API key required |
+| Route Distance | Haversine Formula | Zero-dependency distance calculation |
 | Push Notifications | Firebase FCM | Critical alert delivery to mobile clients |
 | Container | Docker + Docker Compose | Multi-service orchestration, environment parity |
-| Maps (OSM) | OpenStreetMap | Fallback tile rendering for map UI |
 
 ---
 
@@ -72,9 +85,10 @@ The Google Maps Distance Matrix API provides route-aware load factors. Long-haul
 ┌─────────────────────────────────────────────────────────┐
 │                    React Frontend                        │
 │         Redux Store · Axios JWT Interceptor             │
-│    FleetDashboard · MaintenanceGauge · WeatherWidget    │
+│  FleetDashboard · MaintenanceGauge · WeatherWidget      │
+│       MapView (Leaflet+OSM) · Route Optimizer           │
 └──────────────────────┬──────────────────────────────────┘
-                       │ HTTPS + JWT
+                       │ HTTPS + JWT (httpOnly cookies)
 ┌──────────────────────▼──────────────────────────────────┐
 │                   Express API (/api/v1)                  │
 │   Auth · Fleet · Maintenance · Weather · Routes · FCM   │
@@ -82,8 +96,8 @@ The Google Maps Distance Matrix API provides route-aware load factors. Long-haul
 └───┬──────────┬───────────┬────────────┬─────────────────┘
     │          │           │            │
     ▼          ▼           ▼            ▼
-Supabase   Upstash     OpenWeather  Google Maps
-(Postgres)  (Redis)      API          Matrix API
+Supabase   Upstash     OpenWeather  Haversine
+(Postgres)  (Redis)      API        (built-in)
     │          │
     │     ┌────┴───────────┐
     │     │  Cache Layer   │
@@ -106,7 +120,7 @@ Adjusted Interval (km) =
   Base Interval (km)
   × Humidity Multiplier   [0.6 – 1.0, derived from OpenWeather RH%]
   × Fuel Multiplier       [0.9 for E10 blend, 1.0 for RON95]
-  × Load Factor           [0.75 – 1.0, derived from Google Maps route data]
+  × Load Factor           [0.75 – 1.0, derived from route distance + weather]
 ```
 
 **Example — Engine Oil (Honda Wave RSX, mineral oil):**
@@ -162,8 +176,9 @@ smart-fleet-iot/
 │   └── src/
 │       ├── api/                     # Axios instance + JWT interceptors
 │       ├── components/              # Gauge, FleetCard, WeatherWidget, MapView
-│       ├── redux/                   # fleetSlice, userSlice, weatherSlice
-│       └── hooks/                   # useWeather, useMaintenance
+│       ├── redux/                   # fleetSlice, userSlice, weatherSlice, alertSlice
+│       ├── hooks/                   # useWeather
+│       └── test/                    # 32 Vitest tests (all Redux slices)
 │
 ├── backend/
 │   └── src/
@@ -190,9 +205,10 @@ smart-fleet-iot/
 ### Prerequisites
 - Node.js 24+
 - Docker + Docker Compose
-- A Supabase project (free tier works)
-- An Upstash Redis database (free tier works)
+- A Supabase project (free tier)
+- An Upstash Redis database (free tier)
 - OpenWeather API key (free tier: 1,000 calls/day)
+- Firebase project with FCM enabled (for push notifications)
 
 ### 1. Clone and configure
 
@@ -220,9 +236,7 @@ docker-compose -f infrastructure/docker-compose.yml up --build
 
 ### 4. Run database migrations
 
-```bash
-bash scripts/migrate.sh
-```
+Apply the SQL from `docs/database.md` in the Supabase SQL Editor (Dashboard → SQL Editor → New query).
 
 ---
 
@@ -234,13 +248,16 @@ Base URL: `http://localhost:3001/api/v1`
 |---|---|---|
 | POST | `/auth/register` | Create account |
 | POST | `/auth/login` | Authenticate, receive JWT cookies |
-| GET | `/fleet` | List all vehicles for authenticated user |
+| GET | `/auth/me` | Get current user (session restore) |
+| GET | `/fleet` | List all vehicles |
 | POST | `/fleet` | Register a new vehicle |
+| PATCH | `/fleet/:id/mileage` | Update vehicle mileage |
 | GET | `/fleet/:id/status` | Get maintenance status with wear score |
 | POST | `/maintenance/log` | Log a completed service |
 | GET | `/maintenance/:vehicleId` | Get full service history |
-| GET | `/weather/current` | Cached current conditions + humidity multiplier |
-| GET | `/routes/optimize` | Route suggestion with load factor |
+| GET | `/weather/current?lat=&lon=` | Live conditions + humidity multiplier + full stats |
+| GET | `/weather/forecast?lat=&lon=` | 5-day forecast with icons |
+| GET | `/routes/optimize?origin=&destination=` | Route with weather, load factor, maintenance warnings |
 | POST | `/notifications/fcm-token` | Register FCM device token |
 
 Full documentation: `docs/api.md`
@@ -261,11 +278,8 @@ UPSTASH_REDIS_REST_TOKEN=
 
 # OpenWeather
 OPENWEATHER_API_KEY=
-OPENWEATHER_DEFAULT_LAT=10.8231
-OPENWEATHER_DEFAULT_LON=106.6297
-
-# Google Maps
-GOOGLE_MAPS_API_KEY=
+OPENWEATHER_DEFAULT_LAT=10.7769
+OPENWEATHER_DEFAULT_LON=106.7009
 
 # Firebase (FCM)
 FIREBASE_PROJECT_ID=
@@ -280,6 +294,55 @@ JWT_SECRET=
 JWT_REFRESH_SECRET=
 ```
 
+> `GOOGLE_MAPS_API_KEY` is no longer required — route distance uses Haversine (built-in).
+
+---
+
+## Test Suite
+
+**Backend** — 18 unit tests (Jest), zero live API connections required:
+
+```bash
+cd backend && npm test
+```
+
+| Test Group | Tests | Coverage |
+|---|---|---|
+| `getFuelMultiplier` | 5 tests | RON95, E10, E5, RON92, unknown fuel default |
+| `calculateAdjustedInterval` | 7 tests | Floor clamping, humidity-exempt, fuel-exempt components |
+| `getAlertStatus` | 6 tests | NORMAL/WARNING/CRITICAL/OVERDUE thresholds + sustained humidity override |
+
+**Frontend** — 32 unit tests (Vitest), all Redux slices:
+
+```bash
+cd frontend && npm run test -- --run
+```
+
+| Test File | Tests |
+|---|---|
+| `userSlice.test.js` | 8 tests — login, register, logout, session restore, initialized flag |
+| `fleetSlice.test.js` | 10 tests — vehicle CRUD, mileage update, status fetch |
+| `weatherSlice.test.js` | 7 tests — fetch, forecast, routeLocation |
+| `alertSlice.test.js` | 7 tests — FCM token, alert queue |
+
+---
+
+## CI/CD Pipeline
+
+Single workflow: `.github/workflows/ci-deploy.yml`
+
+**On every push/PR to `develop` or `main`:**
+1. Lint Backend
+2. Lint Frontend
+3. Test Backend (dummy env vars, no live connections)
+4. Test Frontend
+5. Docker Build Validation
+
+**On push to `main` only** (after all CI jobs pass):
+- Deploy backend to **Render** (`RENDER_API_KEY` + `RENDER_SERVICE_ID`)
+- Deploy frontend to **Vercel** (`VERCEL_TOKEN` + `VERCEL_ORG_ID` + `VERCEL_PROJECT_ID`)
+- Steps are skipped safely if secrets are not configured
+
 ---
 
 ## AI-Assisted Development Model
@@ -293,21 +356,17 @@ This project was built using a structured 4-layer AI governance protocol:
 | L3 | `.claude/skills/` | Procedural knowledge: how to design APIs, Redux slices, wear formulas |
 | L4 | `.claude/agents/mechanic-pro.md` | Specialist persona: validates all maintenance algorithm changes |
 
-Pre-commit hooks in `.claude/hooks/pre-commit.json` enforce:
-- API endpoints must be documented before commit
-- New environment variables must appear in `.env.example`
-- Service interval changes require a source citation comment
-- No `console.log` in production code (use the logger service)
-
 ---
 
 ## Why This Architecture
 
-**The Problem with Free-Tier APIs:** OpenWeather's free plan allows 1,000 calls/day. A fleet of 10 vehicles refreshing weather every 5 minutes would exhaust that in under 1 hour. The Redis caching layer solves this with a 30-minute TTL, reducing real API calls by ~97% while maintaining data freshness.
+**No Google Maps dependency:** The original design used Google Maps Distance Matrix API, but it requires billing. Route distance now uses a Haversine formula with a 1.3× urban road factor — accurate enough for load factor calculation, zero cost, zero API key.
 
-**The Problem with Simple Mileage Tracking:** A 2,000 km oil change interval was determined by engineers in controlled laboratory conditions — not Ho Chi Minh City monsoon season. The multiplier system codifies real-world wear patterns observed in tropical fleet operations, making the service interval predictions genuinely useful rather than approximations.
+**The Problem with Free-Tier APIs:** OpenWeather's free plan allows 1,000 calls/day. A fleet of 10 vehicles refreshing weather every 5 minutes would exhaust that in under 1 hour. The Redis caching layer solves this with a 30-minute TTL, reducing real API calls by ~97%.
 
-**The Problem with Monolithic State:** Fleet management UIs are data-dense. Without Redux Toolkit's centralized state, maintenance status, weather data, alert counts, and vehicle lists would require deep prop-drilling or scattered local state that becomes impossible to debug. The slice architecture makes every piece of state traceable and testable.
+**The Problem with Simple Mileage Tracking:** A 2,000 km oil change interval was determined by engineers in controlled laboratory conditions — not Ho Chi Minh City monsoon season. The multiplier system codifies real-world wear patterns observed in tropical fleet operations.
+
+**The Problem with Monolithic State:** Without Redux Toolkit's centralized state, maintenance status, weather data, alert counts, and vehicle lists would require deep prop-drilling or scattered local state. The slice architecture makes every piece of state traceable and testable.
 
 ---
 
@@ -319,54 +378,6 @@ Pre-commit hooks in `.claude/hooks/pre-commit.json` enforce:
 - [ ] Multi-vehicle fleet comparison dashboard
 - [ ] Export maintenance history as PDF service record
 - [ ] SMS alerts via Twilio as FCM fallback
-
----
-
-## Test Suite
-
-The backend includes **18 unit tests** covering the core predictive engine, runnable with zero live API connections:
-
-```bash
-cd backend && npm test
-```
-
-| Test Group | Tests | Coverage |
-|---|---|---|
-| `getFuelMultiplier` | 5 tests | RON95, E10, E5, RON92, unknown fuel default |
-| `calculateAdjustedInterval` | 7 tests | Floor clamping, humidity-exempt components, fuel-exempt components |
-| `getAlertStatus` | 6 tests | NORMAL/WARNING/CRITICAL/OVERDUE thresholds + sustained humidity override |
-
-Key implementation notes:
-- `MIN_MULTIPLIER_FLOOR = 0.45` — prevents interval from dropping below 45% of base (e.g. monsoon + E10 + heavy load clamps to 900 km, not 864 km)
-- `spark_plug` is **humidity-exempt** — physical design resists moisture
-- `drive_chain` is **fuel-exempt** — chain wear is mechanical, not combustion-related
-- `CRITICAL` override triggers when humidity ≥ 85% sustained for ≥ 72 hours, regardless of mileage remaining
-
----
-
-## CI/CD Pipeline
-
-### Continuous Integration (`.github/workflows/ci-deploy.yml`)
-
-Runs on every push/PR to `develop` or `main`:
-
-1. **Lint Backend** — ESLint via `backend/.eslintrc.js`
-2. **Lint Frontend** — ESLint via `frontend/.eslintrc.cjs`
-3. **Test Backend** — Jest 18 tests with dummy env vars (no live connections)
-4. **Test Frontend** — Vitest with `--run --passWithNoTests`
-5. **Docker Build** — Validates both Dockerfiles build successfully
-
-### Continuous Deployment (`.github/workflows/cd-deploy.yml`)
-
-Triggers on merge to `main`. Requires GitHub Secrets:
-
-| Secret | Purpose |
-|---|---|
-| `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` | DB migrations via Supabase CLI |
-| `RENDER_API_KEY` / `RENDER_SERVICE_ID` | Backend deploy to Render |
-| `VERCEL_TOKEN` / `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` | Frontend deploy to Vercel |
-
-All deploy steps are gated — if a secret is not set, that step is skipped safely.
 
 ---
 

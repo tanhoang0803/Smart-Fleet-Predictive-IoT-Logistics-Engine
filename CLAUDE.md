@@ -54,7 +54,8 @@ docker-compose -f infrastructure/docker-compose.yml up --build
   Redux Store          Redis Cache         PostgreSQL
        ↑                    ↑
   Axios + JWT       OpenWeather API
-                    Google Maps API
+                    Leaflet + OSM (map display)
+                    Haversine (route distance)
                     Firebase FCM
 ```
 
@@ -65,7 +66,7 @@ docker-compose -f infrastructure/docker-compose.yml up --build
 | Client | `frontend/` | UI rendering, Redux state, Axios JWT interceptors |
 | Server | `backend/` | Business logic, predictive algorithms, 3rd-party orchestration |
 | Persistence | Supabase | PostgreSQL schemas, RLS policies, auth tokens |
-| Cache | Upstash Redis | Rate-limit protection, weather data TTL, session cache |
+| Cache | Upstash Redis | Rate-limit protection, weather data TTL, route cache |
 | Container | `infrastructure/` | Docker-Compose multi-service orchestration |
 | AI | `.claude/` | Agents, skills, hooks, domain memory |
 
@@ -73,13 +74,14 @@ docker-compose -f infrastructure/docker-compose.yml up --build
 
 ## 4. Architecture Constraints (Enforced Rules)
 
-1. **Free-Tier First:** Every call to OpenWeather, Google Maps, or any paid 3rd-party API MUST be cached in Upstash Redis. No cache miss should trigger more than one upstream call per TTL window.
+1. **Free-Tier First:** Every call to OpenWeather or any paid 3rd-party API MUST be cached in Upstash Redis. No cache miss should trigger more than one upstream call per TTL window.
 2. **State Management:** Use Redux Toolkit exclusively. No prop-drilling for fleet or maintenance data. All async fetches go through `createAsyncThunk`.
 3. **Database Security:** Supabase Row Level Security (RLS) MUST be enabled on ALL user-facing tables. No service-role key usage in client-facing endpoints.
 4. **AI Logic Gate:** The `mechanic-pro` agent MUST review and approve all refactors to wear-calculation logic before merge. Tag changes with `# mechanic-pro-reviewed` comment.
 5. **Response Format:** All API responses conform to the envelope below — no exceptions:
    - Success: `{ "success": true, "data": { ... }, "meta": { "timestamp": "", "requestId": "" } }`
    - Error: `{ "success": false, "data": null, "error": { "code": "ERR_CODE", "message": "..." } }`
+6. **No Google Maps dependency:** Route distance uses Haversine formula (zero external API). Map display uses Leaflet + OpenStreetMap (free, no API key).
 
 ---
 
@@ -93,7 +95,7 @@ All service interval calculations MUST follow this priority chain:
 Base Interval (km)
   × Humidity Multiplier     (from OpenWeather API)
   × Fuel Quality Multiplier (E10 default for Vietnam)
-  × Load Factor             (from Google Maps route data)
+  × Load Factor             (from Haversine route data + weather condition)
   = Adjusted Interval (km)
 ```
 
@@ -121,6 +123,18 @@ Base Interval (km)
 - Cache TTL in Redis: **30 minutes** for current, **3 hours** for forecast
 - Humidity threshold for multiplier activation: **> 70% RH**
 - Never call OpenWeather directly from the frontend — always proxy through `/api/v1/weather`
+- Weather endpoint accepts `?lat=&lon=` for location-specific conditions
+- Route optimizer fetches weather at origin coords and enriches response with `weatherLoadFactor`, `adjustedFuelL`, `maintenanceWarnings`
+
+### 5.4 Route Optimizer Contract
+
+- Distance calculated using **Haversine formula × 1.3 urban road factor** (no external API)
+- Cache TTL in Redis: **1 hour** per origin/destination pair
+- Weather fetched in parallel with route calculation — enriches response
+- `weatherLoadFactor` = base loadFactor × 0.9 if rain/storm detected
+- `adjustedFuelL` = base fuelEstimate ÷ humidityMultiplier
+- `maintenanceWarnings[]` generated based on humidity + condition + temperature
+- Accepting a route updates vehicle mileage AND resets WeatherWidget to origin location
 
 ---
 
@@ -162,12 +176,18 @@ All endpoints follow the standard defined in `.claude/skills/api-design.md`.
 ### Endpoint Groups
 | Group | Prefix | Auth Required |
 |---|---|---|
-| Auth | `/api/v1/auth` | No (login/register), Yes (refresh/logout) |
+| Auth | `/api/v1/auth` | No (login/register), Yes (me/logout) |
 | Fleet | `/api/v1/fleet` | Yes |
 | Maintenance | `/api/v1/maintenance` | Yes |
 | Weather | `/api/v1/weather` | Yes |
 | Routes | `/api/v1/routes` | Yes |
 | Notifications | `/api/v1/notifications` | Yes |
+
+### Auth Endpoints
+- `POST /auth/register` — creates user via `supabaseAdmin.auth.admin.createUser()` (bypasses email confirmation)
+- `POST /auth/login` — returns JWT in `httpOnly` cookies
+- `GET /auth/me` — returns current user profile (used for session restore on page refresh)
+- `POST /auth/logout`
 
 ---
 
@@ -178,30 +198,40 @@ All endpoints follow the standard defined in `.claude/skills/api-design.md`.
 | Slice | File | Owns |
 |---|---|---|
 | `fleetSlice` | `redux/fleetSlice.js` | Vehicle list, selected vehicle, maintenance status |
-| `userSlice` | `redux/userSlice.js` | Auth state, JWT token, user profile |
-| `weatherSlice` | `redux/weatherSlice.js` | Current conditions, forecast, multiplier values |
+| `userSlice` | `redux/userSlice.js` | Auth state, JWT token, user profile, `initialized` flag |
+| `weatherSlice` | `redux/weatherSlice.js` | Current conditions, forecast, multiplier values, `routeLocation` |
 | `alertSlice` | `redux/alertSlice.js` | Notification queue, FCM token |
+
+### Key State Fields
+- `userSlice.initialized` — `false` until `restoreSession` completes; AuthGuard shows spinner until `true`
+- `weatherSlice.routeLocation` — `{ lat, lon }` set when user presses Optimize Route or Accept Route; `null` = default HCM city; WeatherWidget reads this to show location-specific weather
 
 ### Rules
 - **Never** fetch API data outside of Redux Thunks or RTK Query hooks
 - **Never** store JWT in `localStorage` — use `httpOnly` cookies via the backend
 - Selectors MUST be memoized via `createSelector` (see `.claude/skills/redux-patterns.md`)
 - All API calls go through the centralized Axios instance at `frontend/src/api/axiosClient.js`
+- Session is restored on page load via `store.dispatch(restoreSession())` in `main.jsx`
 
 ### Component Hierarchy
 ```
 App
-├── AuthGuard (JWT validation)
-│   ├── Dashboard
-│   │   ├── FleetOverview (vehicle cards)
-│   │   ├── MaintenanceGauge (arc progress, color-coded)
-│   │   ├── WeatherWidget (humidity, rain forecast)
-│   │   └── AlertBanner (CRITICAL/OVERDUE)
-│   └── RouteOptimizer
-│       ├── MapView (Google Maps embed)
-│       └── FuelLoadRatioPanel
-└── AuthPages (Login / Register)
+├── AuthGuard (waits for initialized=true before redirecting)
+│   ├── DashboardPage
+│   │   ├── WeatherWidget (location-aware: updates on route optimize/accept)
+│   │   ├── AlertBanner (CRITICAL/OVERDUE)
+│   │   ├── Tab: fleet
+│   │   │   ├── FleetCard (vehicle list, worst alert status badge)
+│   │   │   └── MaintenanceGauge (arc progress, color-coded)
+│   │   └── Tab: map
+│   │       └── MapView (Leaflet+OSM, Route Optimizer, weather panel, Refresh/Accept)
+└── AuthPages (Login / Register with footer)
 ```
+
+### MapView Behaviour
+- **Optimize Route**: draws route on map, updates WeatherWidget to origin location, shows below-map panel
+- **↺ Refresh Route**: clears form + map + route panel, resets WeatherWidget to default HCM
+- **✓ Accept Route**: updates vehicle mileage via `updateMileage` thunk, recalculates maintenance via `fetchVehicleStatus`, then clears form + map + resets WeatherWidget to default HCM
 
 ---
 
@@ -213,9 +243,36 @@ App
 |---|---|---|
 | `MaintenanceService` | `services/maintenanceService.js` | Core predictive logic, interval calculation |
 | `WeatherService` | `services/weatherService.js` | OpenWeather fetch + Redis cache layer |
-| `RouteService` | `services/routeService.js` | Google Maps Matrix API integration |
+| `RouteService` | `services/routeService.js` | Haversine distance + load factor (no external API) |
 | `NotificationService` | `services/notificationService.js` | FCM push notification dispatch (lazy Firebase init) |
 | `AuthService` | `services/authService.js` | JWT sign/verify, Supabase auth bridge |
+
+### WeatherService Response Fields (getCurrentConditions)
+```js
+{
+  city, country, humidity, temperature, feelsLike,
+  condition,      // main category: "Rain", "Clear", etc. — used for business logic
+  description,    // detailed: "overcast clouds" — used for display
+  icon,           // OpenWeather icon code e.g. "04d"
+  windSpeed,      // km/h (converted from m/s)
+  visibility,     // km
+  pressure,       // hPa
+  sunrise,        // unix timestamp
+  sunset,         // unix timestamp
+  humidityMultiplier, cachedAt
+}
+```
+
+### RouteController enriched response (GET /routes/optimize)
+```js
+{
+  distanceKm, durationMin, loadFactor, fuelEstimateL,
+  weatherLoadFactor,   // rain-adjusted load factor
+  adjustedFuelL,       // humidity-adjusted fuel estimate
+  weather: { city, condition, temperature, humidity, humidityMultiplier, isRainy },
+  maintenanceWarnings: [{ level: 'CRITICAL|WARNING|INFO', message }]
+}
+```
 
 ### Firebase Initialization Rule
 
@@ -260,6 +317,7 @@ route_logs      — Trip history (vehicle_id, origin, destination, km, load_fact
 4. **SQL Injection:** Supabase client uses parameterized queries by default — never interpolate user input into query strings
 5. **Secrets:** ALL secrets via environment variables — never hardcode API keys. Validate at startup via `validateEnv()` utility
 6. **CORS:** Whitelist only `FRONTEND_URL` env var — never `*` in production
+7. **Registration:** Uses `supabaseAdmin.auth.admin.createUser({ email_confirm: true })` to bypass email provider restrictions
 
 ---
 
@@ -277,12 +335,9 @@ UPSTASH_REDIS_REST_TOKEN=
 
 # OpenWeather
 OPENWEATHER_API_KEY=
-OPENWEATHER_DEFAULT_CITY=Ho Chi Minh City
-OPENWEATHER_DEFAULT_LAT=10.8231
-OPENWEATHER_DEFAULT_LON=106.6297
-
-# Google Maps
-GOOGLE_MAPS_API_KEY=
+OPENWEATHER_DEFAULT_CITY="Ho Chi Minh City"
+OPENWEATHER_DEFAULT_LAT=10.7769
+OPENWEATHER_DEFAULT_LON=106.7009
 
 # Firebase (FCM)
 FIREBASE_PROJECT_ID=
@@ -297,6 +352,8 @@ JWT_SECRET=
 JWT_REFRESH_SECRET=
 ```
 
+> Note: `GOOGLE_MAPS_API_KEY` is no longer required. Route distance uses Haversine (no API key needed).
+
 ---
 
 ## 12. Docker / Infrastructure Rules
@@ -304,6 +361,7 @@ JWT_REFRESH_SECRET=
 - **Never** run `npm install` inside a running container — rebuild the image
 - `docker-compose.yml` defines two services: `backend` and `redis` (Upstash is remote; local Redis is for dev only)
 - Frontend is served via Nginx in production (see `infrastructure/frontend.Dockerfile` multi-stage build)
+- Frontend Dockerfile uses `RUN printf` for nginx config (no BuildKit heredoc syntax required)
 - Health checks MUST be defined for all services
 - No ports exposed to `0.0.0.0` in production — use reverse proxy (Nginx/Caddy)
 
@@ -351,16 +409,34 @@ The hook at `.claude/hooks/pre-commit.json` blocks commits that:
 - **Linting (backend):** ESLint via `backend/.eslintrc.js` — extends `eslint:recommended`, env: `node + jest`, `no-console: error`
 - **Linting (frontend):** ESLint via `frontend/.eslintrc.cjs` — extends `eslint:recommended + react/recommended + react-hooks/recommended`, `react/prop-types: off`
 - **Formatting:** Prettier — single quotes, 2-space indent, 100-char line width
-- **Testing:** Jest (`backend/`) for unit tests — 18 tests covering `maintenanceService.js`. Vitest (`frontend/`) for component tests.
+- **Testing:** Jest (`backend/`) for unit tests — 18 tests covering `maintenanceService.js`. Vitest (`frontend/`) for component tests — 32 tests covering all 4 Redux slices.
 - **Coverage:** `collectCoverageFrom` scoped to `src/services/**/*.js` — no global thresholds enforced in CI
 - **Line endings:** `.gitattributes` enforces `eol=lf` for all source files (Windows-safe)
 - **Commits:** Conventional Commits format — `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`
 - **Branches:** `main` (production), `develop` (integration), `feat/*`, `fix/*`
-- **CI:** GitHub Actions (Node 24) — lint + test + Docker build on every push/PR to `develop`/`main`
+- **CI/CD:** Single GitHub Actions workflow (`ci-deploy.yml`) — lint + test + Docker build on every push/PR; deploy job runs only on push to `main` after all CI jobs pass
 
 ---
 
-## 16. Domain Memory Index
+## 16. CI/CD Pipeline
+
+Single workflow file: `.github/workflows/ci-deploy.yml`
+
+**CI jobs** (run on every push/PR to `develop` or `main`):
+1. Lint Backend
+2. Lint Frontend
+3. Test Backend (18 Jest tests, dummy env vars, no live connections)
+4. Test Frontend (32 Vitest tests)
+5. Docker Build Validation (both Dockerfiles)
+
+**Deploy job** (push to `main` only, `needs: [build-docker]`):
+- Skipped if secrets not set (safe by default)
+- Backend → Render via REST API (`RENDER_API_KEY` + `RENDER_SERVICE_ID`)
+- Frontend → Vercel CLI with `--yes --no-clipboard` (`VERCEL_TOKEN` + `VERCEL_ORG_ID` + `VERCEL_PROJECT_ID`)
+
+---
+
+## 17. Domain Memory Index
 
 | File | Contents |
 |---|---|
@@ -369,12 +445,12 @@ The hook at `.claude/hooks/pre-commit.json` blocks commits that:
 
 ---
 
-## 17. Repository
+## 18. Repository
 
 - **GitHub:** `https://github.com/tanhoang0803/Smart-Fleet-Predictive-IoT-Logistics-Engine`
 - **CI Status:** GitHub Actions — lint + test + Docker build (Node 24, ubuntu-latest)
-- **CD:** Auto-deploy to Render (backend) + Vercel (frontend) on merge to `main` (requires GitHub Secrets)
+- **CD:** Auto-deploy to Render (backend) + Vercel (frontend) on merge to `main` (requires GitHub Secrets — see section 16)
 
 ---
 
-*Last updated: 2026-03-22 | Authority: L1*
+*Last updated: 2026-03-24 | Authority: L1*
