@@ -1,7 +1,7 @@
 // Smart-Fleet IoT — Server Entry Point
 // TanQHoang © 2026
 
-require('dotenv').config();
+require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
 require('express-async-errors');
 
 const { validateEnv } = require('./src/utils/validateEnv');

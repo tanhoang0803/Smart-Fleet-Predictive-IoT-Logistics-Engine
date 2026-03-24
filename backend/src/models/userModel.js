@@ -1,7 +1,7 @@
 // Smart-Fleet IoT — User Model
 // TanQHoang © 2026
 
-const { supabase } = require('../utils/supabaseClient');
+const { supabase, supabaseAdmin } = require('../utils/supabaseClient');
 
 const userModel = {
   async findBySupabaseUid(supabaseUid) {
@@ -25,7 +25,7 @@ const userModel = {
   },
 
   async create({ supabaseUid, email, name }) {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from('users')
       .insert({ supabase_uid: supabaseUid, email, name })
       .select('id, email, name')

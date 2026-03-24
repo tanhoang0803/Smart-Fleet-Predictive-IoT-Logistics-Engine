@@ -2,7 +2,7 @@
 // TanQHoang © 2026
 
 const { SignJWT, jwtVerify } = require('jose');
-const { supabase } = require('../utils/supabaseClient');
+const { supabase, supabaseAdmin } = require('../utils/supabaseClient');
 const userModel = require('../models/userModel');
 const logger = require('../utils/logger');
 
@@ -13,11 +13,15 @@ const REFRESH_EXPIRES = process.env.JWT_REFRESH_EXPIRES_IN || '7d';
 
 const authService = {
   async register(email, password, name) {
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabaseAdmin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    });
     if (error) {
       const err = new Error(error.message);
       err.status = error.status === 422 ? 409 : 400;
-      err.code = 'DUPLICATE_EMAIL';
+      err.code = error.message.includes('already') ? 'DUPLICATE_EMAIL' : 'REGISTRATION_FAILED';
       throw err;
     }
 
