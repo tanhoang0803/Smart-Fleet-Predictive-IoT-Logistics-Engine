@@ -12,8 +12,8 @@ const mockCurrent = {
 };
 
 const mockForecast = [
-  { date: '2026-03-25', tempMax: 34, humidity: 80, condition: 'Sunny', icon: '01d' },
-  { date: '2026-03-26', tempMax: 32, humidity: 85, condition: 'Rain', icon: '10d' },
+  { date: '2026-03-25', maxTemp: 34, minTemp: 28, avgHumidity: 80, condition: 'Sunny' },
+  { date: '2026-03-26', maxTemp: 32, minTemp: 26, avgHumidity: 85, condition: 'Rain' },
 ];
 
 describe('weatherSlice', () => {

@@ -86,15 +86,9 @@ export function WeatherWidget({ lat, lon }) {
             {forecast.slice(0, 5).map((day, i) => (
               <div key={i} className="flex flex-col items-center gap-1">
                 <span className="text-xs text-fleet-muted">{formatDay(day.date)}</span>
-                {day.icon && (
-                  <img
-                    src={`https://openweathermap.org/img/wn/${day.icon}.png`}
-                    alt={day.condition}
-                    className="w-8 h-8"
-                  />
-                )}
-                <span className="text-xs font-semibold text-fleet-text">{Math.round(day.tempMax)}°</span>
-                <span className="text-xs text-fleet-accent">{day.humidity}%</span>
+                <span className="text-xs text-fleet-muted">{day.condition}</span>
+                <span className="text-xs font-semibold text-fleet-text">{day.maxTemp}°</span>
+                <span className="text-xs text-fleet-accent">{day.avgHumidity}%</span>
               </div>
             ))}
           </div>

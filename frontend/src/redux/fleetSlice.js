@@ -95,7 +95,6 @@ const fleetSlice = createSlice({
 });
 
 export const { selectVehicle, clearError } = fleetSlice.actions;
-export { logMaintenance };
 export default fleetSlice.reducer;
 
 // ─── Selectors ────────────────────────────────────────────────────────────────
