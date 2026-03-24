@@ -102,6 +102,9 @@ export function MapView({ vehicleId, vehicle }) {
     setRouteData(null);
     setAccepted(false);
     setError(null);
+    // Clear markers + route line from map, return to HCM default view
+    if (routeLayer.current) { routeLayer.current.remove(); routeLayer.current = null; }
+    if (leafletMap.current) leafletMap.current.setView(HCM_CENTER, 13);
     dispatch(setRouteLocation(null));
     dispatch(fetchWeather({}));
     dispatch(fetchForecast({}));
