@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import reducer, { clearError, fetchWeather, fetchForecast } from '@/redux/weatherSlice';
 
-const initial = { current: null, forecast: [], loading: false, error: null };
+const initial = { current: null, forecast: [], loading: false, error: null, routeLocation: null };
 
 const mockCurrent = {
   city: 'Ho Chi Minh City', temperature: 33, humidity: 82,

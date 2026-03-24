@@ -13,6 +13,7 @@ import {
   selectAllVehicles, selectFleetLoading, selectSelectedStatus, selectVehicle,
   selectStatusByVehicleId,
 } from '@/redux/fleetSlice';
+import { selectRouteLocation } from '@/redux/weatherSlice';
 import { AlertBanner } from '@/components/AlertBanner';
 import { FleetCard } from '@/components/FleetCard';
 import { MaintenanceGauge } from '@/components/MaintenanceGauge';
@@ -296,6 +297,7 @@ function DashboardPage() {
   const loading       = useSelector(selectFleetLoading);
   const selected      = useSelector(selectSelectedStatus);
   const statusMap     = useSelector(selectStatusByVehicleId);
+  const routeLocation = useSelector(selectRouteLocation);
   const [activeTab, setActiveTab] = useState('fleet');
   const [showAddVehicle, setShowAddVehicle] = useState(false);
   const [showLogMaintenance, setShowLogMaintenance] = useState(false);
@@ -340,7 +342,7 @@ function DashboardPage() {
 
       <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
         <AlertBanner />
-        <WeatherWidget />
+        <WeatherWidget lat={routeLocation?.lat} lon={routeLocation?.lon} />
 
         <div className="flex gap-2 border-b border-fleet-border pb-1">
           {['fleet', 'map'].map((tab) => (

@@ -29,6 +29,7 @@ const initialState = {
   forecast: [],
   loading: false,
   error: null,
+  routeLocation: null, // { lat, lon } — set when user accepts a route
 };
 
 const weatherSlice = createSlice({
@@ -36,6 +37,7 @@ const weatherSlice = createSlice({
   initialState,
   reducers: {
     clearError: (state) => { state.error = null; },
+    setRouteLocation: (state, action) => { state.routeLocation = action.payload; },
   },
   extraReducers: (builder) => {
     builder
@@ -54,7 +56,7 @@ const weatherSlice = createSlice({
   },
 });
 
-export const { clearError } = weatherSlice.actions;
+export const { clearError, setRouteLocation } = weatherSlice.actions;
 export default weatherSlice.reducer;
 
 // ─── Selectors ────────────────────────────────────────────────────────────────
@@ -64,3 +66,4 @@ export const selectForecast            = createSelector(selectWeatherState, (w) 
 export const selectHumidityMultiplier  = createSelector(selectWeatherState, (w) => w.current?.humidityMultiplier ?? 1.0);
 export const selectWeatherLoading      = createSelector(selectWeatherState, (w) => w.loading);
 export const selectWeatherError        = createSelector(selectWeatherState, (w) => w.error);
+export const selectRouteLocation       = createSelector(selectWeatherState, (w) => w.routeLocation);

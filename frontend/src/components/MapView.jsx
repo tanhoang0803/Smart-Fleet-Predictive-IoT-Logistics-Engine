@@ -5,6 +5,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchVehicleStatus, updateMileage, selectStatusByVehicleId } from '@/redux/fleetSlice';
+import { fetchWeather, fetchForecast, setRouteLocation } from '@/redux/weatherSlice';
 import axiosClient from '@/api/axiosClient';
 
 let L = null;
@@ -124,6 +125,13 @@ export function MapView({ vehicleId, vehicle }) {
     try {
       await dispatch(updateMileage({ vehicleId, mileageCurrent: newMileage }));
       await dispatch(fetchVehicleStatus(vehicleId));
+
+      // Update WeatherWidget to show conditions at the route's origin location
+      const [oLat, oLon] = origin.split(',').map(Number);
+      dispatch(setRouteLocation({ lat: oLat, lon: oLon }));
+      dispatch(fetchWeather({ lat: oLat, lon: oLon }));
+      dispatch(fetchForecast({ lat: oLat, lon: oLon }));
+
       setAccepted(true);
       setRouteData(null);
     } catch {
