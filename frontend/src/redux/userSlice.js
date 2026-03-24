@@ -22,6 +22,15 @@ export const registerUser = createAsyncThunk('user/register', async ({ email, pa
   }
 });
 
+export const restoreSession = createAsyncThunk('user/restoreSession', async (_, { rejectWithValue }) => {
+  try {
+    const { data } = await axiosClient.get('/auth/me');
+    return data.data.user;
+  } catch {
+    return rejectWithValue(null);
+  }
+});
+
 export const logoutUser = createAsyncThunk('user/logout', async (_, { rejectWithValue }) => {
   try {
     await axiosClient.post('/auth/logout');
@@ -33,6 +42,7 @@ export const logoutUser = createAsyncThunk('user/logout', async (_, { rejectWith
 const initialState = {
   profile: null,
   isAuthenticated: false,
+  initialized: false,
   loading: false,
   error: null,
 };
@@ -61,7 +71,15 @@ const userSlice = createSlice({
         state.loading = false;
         state.error = action.payload;
       })
-      .addCase(logoutUser.fulfilled, () => initialState);
+      .addCase(restoreSession.fulfilled, (state, action) => {
+        state.profile = action.payload;
+        state.isAuthenticated = true;
+        state.initialized = true;
+      })
+      .addCase(restoreSession.rejected, (state) => {
+        state.initialized = true;
+      })
+      .addCase(logoutUser.fulfilled, () => ({ ...initialState, initialized: true }));
   },
 });
 
@@ -74,3 +92,4 @@ export const selectProfile       = createSelector(selectUserState, (u) => u.prof
 export const selectIsAuthenticated = createSelector(selectUserState, (u) => u.isAuthenticated);
 export const selectUserLoading   = createSelector(selectUserState, (u) => u.loading);
 export const selectUserError     = createSelector(selectUserState, (u) => u.error);
+export const selectInitialized   = createSelector(selectUserState, (u) => u.initialized);

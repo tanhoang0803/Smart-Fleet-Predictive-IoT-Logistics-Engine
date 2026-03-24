@@ -71,6 +71,18 @@ router.post('/refresh', async (req, res) => {
   });
 });
 
+// GET /api/v1/auth/me
+router.get('/me', authMiddleware, async (req, res) => {
+  const userModel = require('../models/userModel');
+  const user = await userModel.findById(req.user.id);
+  res.status(200).json({
+    success: true,
+    data: { user },
+    meta: { timestamp: new Date().toISOString(), requestId: req.requestId },
+    error: null,
+  });
+});
+
 // POST /api/v1/auth/logout
 router.post('/logout', authMiddleware, (req, res) => {
   authService.clearCookies(res);

@@ -5,8 +5,8 @@ import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { useState, useEffect } from 'react';
 import {
-  selectIsAuthenticated, loginUser, registerUser, logoutUser,
-  selectUserLoading, selectUserError, clearError as clearUserError,
+  selectIsAuthenticated, loginUser, registerUser, logoutUser, restoreSession,
+  selectUserLoading, selectUserError, selectInitialized, clearError as clearUserError,
 } from '@/redux/userSlice';
 import {
   fetchFleet, registerVehicle, fetchVehicleStatus, updateMileage, logMaintenance,
@@ -180,6 +180,12 @@ function UpdateMileageModal({ vehicle, onClose }) {
 // ─── Auth Guard ───────────────────────────────────────────────────────────────
 function AuthGuard({ children }) {
   const isAuthenticated = useSelector(selectIsAuthenticated);
+  const initialized     = useSelector(selectInitialized);
+  if (!initialized) return (
+    <div className="min-h-screen flex items-center justify-center bg-fleet-bg">
+      <div className="w-8 h-8 border-2 border-fleet-accent border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
   return isAuthenticated ? children : <Navigate to="/login" replace />;
 }
 
