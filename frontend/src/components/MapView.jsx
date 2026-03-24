@@ -1,6 +1,6 @@
 // Smart-Fleet IoT — Map View Component
 // TanQHoang © 2026
-// Leaflet + OpenStreetMap (free, no API key) + haversine routing
+// Leaflet + OpenStreetMap (free, no API key) + haversine routing + live weather
 
 import { useState, useEffect, useRef } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
@@ -10,6 +10,17 @@ import axiosClient from '@/api/axiosClient';
 let L = null;
 const HCM_CENTER = [10.7769, 106.7009];
 
+const CONDITION_ICON = {
+  Clear: '☀️', Clouds: '☁️', Rain: '🌧️', Drizzle: '🌦️',
+  Thunderstorm: '⛈️', Snow: '❄️', Mist: '🌫️', Fog: '🌫️', default: '🌡️',
+};
+
+const WARNING_STYLE = {
+  CRITICAL: 'bg-red-500/10 border-red-500/40 text-red-400',
+  WARNING:  'bg-yellow-500/10 border-yellow-500/40 text-yellow-400',
+  INFO:     'bg-blue-500/10 border-blue-500/40 text-blue-400',
+};
+
 export function MapView({ vehicleId, vehicle }) {
   const dispatch   = useDispatch();
   const statusMap  = useSelector(selectStatusByVehicleId);
@@ -17,13 +28,13 @@ export function MapView({ vehicleId, vehicle }) {
   const leafletMap = useRef(null);
   const routeLayer = useRef(null);
 
-  const [origin, setOrigin]         = useState('');
-  const [destination, setDest]      = useState('');
-  const [routeData, setRouteData]   = useState(null);
-  const [loading, setLoading]       = useState(false);
-  const [accepting, setAccepting]   = useState(false);
-  const [accepted, setAccepted]     = useState(false);
-  const [error, setError]           = useState(null);
+  const [origin, setOrigin]       = useState('');
+  const [destination, setDest]    = useState('');
+  const [routeData, setRouteData] = useState(null);
+  const [loading, setLoading]     = useState(false);
+  const [accepting, setAccepting] = useState(false);
+  const [accepted, setAccepted]   = useState(false);
+  const [error, setError]         = useState(null);
 
   // Current mileage from Redux (stays fresh after updates)
   const currentMileage = statusMap[vehicleId]?.vehicle?.mileage_current ?? vehicle?.mileage_current ?? 0;
@@ -111,13 +122,11 @@ export function MapView({ vehicleId, vehicle }) {
     setAccepting(true);
     setError(null);
     try {
-      // Add route distance to current mileage
       await dispatch(updateMileage({ vehicleId, mileageCurrent: newMileage }));
-      // Recalculate maintenance schedule with updated km + load factor
       await dispatch(fetchVehicleStatus(vehicleId));
       setAccepted(true);
-      setRouteData(null); // clear after accepting
-    } catch (err) {
+      setRouteData(null);
+    } catch {
       setError('Failed to update mileage. Try again.');
     } finally {
       setAccepting(false);
@@ -126,11 +135,14 @@ export function MapView({ vehicleId, vehicle }) {
 
   const field = 'bg-fleet-bg border border-fleet-border rounded-lg px-3 py-2 text-sm text-fleet-text placeholder-fleet-muted focus:outline-none focus:border-fleet-accent';
 
+  const w = routeData?.weather;
+  const conditionIcon = w ? (CONDITION_ICON[w.condition] ?? CONDITION_ICON.default) : null;
+
   return (
     <div className="bg-fleet-surface border border-fleet-border rounded-xl overflow-hidden">
-      <div className="p-4 border-b border-fleet-border space-y-3">
 
-        {/* Header */}
+      {/* Top panel — form */}
+      <div className="p-4 border-b border-fleet-border space-y-3">
         <div className="flex items-center justify-between">
           <h3 className="text-sm font-semibold text-fleet-text">Route Optimizer</h3>
           {vehicle && (
@@ -140,7 +152,6 @@ export function MapView({ vehicleId, vehicle }) {
           )}
         </div>
 
-        {/* Form */}
         <form onSubmit={handleOptimize} className="flex flex-col gap-2">
           <input className={field} placeholder="Origin (lat,lon) e.g. 10.776,106.700"
             value={origin} onChange={(e) => { setOrigin(e.target.value); setRouteData(null); setAccepted(false); }} />
@@ -155,6 +166,7 @@ export function MapView({ vehicleId, vehicle }) {
         {error && <p className="text-red-400 text-xs">{error}</p>}
       </div>
 
+      {/* Map */}
       <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
       <div ref={mapRef} style={{ height: '320px', width: '100%' }} />
 
@@ -174,11 +186,11 @@ export function MapView({ vehicleId, vehicle }) {
                 <p className="text-xs text-fleet-muted">Duration</p>
               </div>
               <div>
-                <p className="text-sm font-bold text-fleet-text">×{routeData.loadFactor}</p>
+                <p className="text-sm font-bold text-fleet-text">×{routeData.weatherLoadFactor ?? routeData.loadFactor}</p>
                 <p className="text-xs text-fleet-muted">Load factor</p>
               </div>
               <div>
-                <p className="text-sm font-bold text-fleet-text">{routeData.fuelEstimateL} L</p>
+                <p className="text-sm font-bold text-fleet-text">{routeData.adjustedFuelL ?? routeData.fuelEstimateL} L</p>
                 <p className="text-xs text-fleet-muted">Fuel est.</p>
               </div>
             </div>
@@ -191,6 +203,62 @@ export function MapView({ vehicleId, vehicle }) {
               <span className="text-fleet-text font-semibold">
                 {currentMileage?.toLocaleString()} → <span className="text-fleet-accent">{newMileage?.toLocaleString()} km</span>
               </span>
+            </div>
+          )}
+
+          {/* Weather at origin */}
+          {routeData && w && (
+            <div className="bg-fleet-bg border border-fleet-border rounded-lg p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-fleet-text">
+                  {conditionIcon} Weather at Origin — {w.city}
+                </span>
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
+                  w.isRainy ? 'bg-blue-500/10 border-blue-500/40 text-blue-400' : 'bg-green-500/10 border-green-500/40 text-green-400'
+                }`}>
+                  {w.condition}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <p className="text-sm font-bold text-fleet-text">{w.temperature}°C</p>
+                  <p className="text-xs text-fleet-muted">Temp</p>
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-fleet-text">{w.humidity}%</p>
+                  <p className="text-xs text-fleet-muted">Humidity</p>
+                </div>
+                <div>
+                  <p className={`text-sm font-bold ${w.humidityMultiplier < 0.80 ? 'text-red-400' : w.humidityMultiplier < 1.00 ? 'text-yellow-400' : 'text-green-400'}`}>
+                    ×{w.humidityMultiplier}
+                  </p>
+                  <p className="text-xs text-fleet-muted">Maint. mult.</p>
+                </div>
+              </div>
+
+              {/* Fuel comparison */}
+              {routeData.adjustedFuelL !== routeData.fuelEstimateL && (
+                <div className="flex items-center justify-between text-xs pt-1 border-t border-fleet-border">
+                  <span className="text-fleet-muted">Humidity fuel impact</span>
+                  <span className="text-fleet-text">
+                    <span className="line-through text-fleet-muted mr-1">{routeData.fuelEstimateL} L</span>
+                    <span className="text-yellow-400 font-semibold">{routeData.adjustedFuelL} L</span>
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Maintenance warnings */}
+          {routeData && routeData.maintenanceWarnings?.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold text-fleet-muted uppercase tracking-wide">Maintenance Alerts</p>
+              {routeData.maintenanceWarnings.map((w, i) => (
+                <div key={i} className={`border rounded-lg px-3 py-2 text-xs ${WARNING_STYLE[w.level] ?? WARNING_STYLE.INFO}`}>
+                  <span className="font-bold mr-1">[{w.level}]</span>{w.message}
+                </div>
+              ))}
             </div>
           )}
 
