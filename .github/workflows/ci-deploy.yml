@@ -114,8 +114,7 @@ jobs:
         if: env.VERCEL_TOKEN != '' && env.VERCEL_ORG_ID != '' && env.VERCEL_PROJECT_ID != ''
         run: |
           npm install -g vercel --silent
-          cd frontend
-          vercel --prod --yes --no-clipboard --token=$VERCEL_TOKEN
+          vercel --prod --yes --token=$VERCEL_TOKEN
 
       - name: Deployment complete
         run: echo "Smart-Fleet IoT deployment pipeline finished."
