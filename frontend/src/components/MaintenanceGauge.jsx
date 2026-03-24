@@ -11,10 +11,6 @@ const STATUS_COLOR = {
 const RADIUS = 40;
 const CIRCUMFERENCE = Math.PI * RADIUS; // Half-circle arc
 
-function polarToCartesian(cx, cy, r, angleDeg) {
-  const rad = ((angleDeg - 180) * Math.PI) / 180;
-  return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) };
-}
 
 export function MaintenanceGauge({ component, percentRemaining, status, adjustedIntervalKm, kmRemaining }) {
   const clampedPct = Math.min(100, Math.max(0, percentRemaining));

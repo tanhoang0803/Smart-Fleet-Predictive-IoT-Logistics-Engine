@@ -4,7 +4,7 @@
 import { describe, it, expect } from 'vitest';
 import reducer, { clearError, loginUser, registerUser, logoutUser } from '@/redux/userSlice';
 
-const initial = { profile: null, isAuthenticated: false, loading: false, error: null };
+const initial = { profile: null, isAuthenticated: false, initialized: false, loading: false, error: null };
 
 describe('userSlice', () => {
   it('returns initial state', () => {
@@ -58,8 +58,8 @@ describe('userSlice', () => {
   });
 
   it('logoutUser.fulfilled resets to initial state', () => {
-    const loggedIn = { profile: { id: '1' }, isAuthenticated: true, loading: false, error: null };
+    const loggedIn = { profile: { id: '1' }, isAuthenticated: true, initialized: true, loading: false, error: null };
     const state = reducer(loggedIn, { type: logoutUser.fulfilled.type });
-    expect(state).toEqual(initial);
+    expect(state).toEqual({ ...initial, initialized: true });
   });
 });

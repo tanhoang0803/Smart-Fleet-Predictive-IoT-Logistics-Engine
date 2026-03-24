@@ -5,7 +5,7 @@ import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { useState, useEffect } from 'react';
 import {
-  selectIsAuthenticated, loginUser, registerUser, logoutUser, restoreSession,
+  selectIsAuthenticated, loginUser, registerUser, logoutUser,
   selectUserLoading, selectUserError, selectInitialized, clearError as clearUserError,
 } from '@/redux/userSlice';
 import {
