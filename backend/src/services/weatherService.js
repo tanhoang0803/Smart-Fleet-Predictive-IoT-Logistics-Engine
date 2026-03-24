@@ -47,10 +47,18 @@ const weatherService = {
 
       const result = {
         city: data.name,
+        country: data.sys?.country || '',
         humidity: data.main.humidity,
-        temperature: data.main.temp,
+        temperature: Math.round(data.main.temp),
+        feelsLike: Math.round(data.main.feels_like),
         condition: data.weather[0]?.main || 'Clear',
+        description: data.weather[0]?.description || 'clear sky',
         icon: data.weather[0]?.icon || '01d',
+        windSpeed: Math.round((data.wind?.speed ?? 0) * 3.6), // m/s → km/h
+        visibility: data.visibility ? +((data.visibility / 1000).toFixed(1)) : null, // m → km
+        pressure: data.main.pressure,
+        sunrise: data.sys?.sunrise ?? null, // unix timestamp
+        sunset: data.sys?.sunset ?? null,   // unix timestamp
         humidityMultiplier: getHumidityMultiplier(data.main.humidity),
         cachedAt: new Date().toISOString(),
       };
@@ -125,23 +133,30 @@ const weatherService = {
         timeout: 5000,
       });
 
-      // Group by day and average humidity
+      // Group by day
       const byDay = {};
       data.list.forEach((item) => {
         const date = item.dt_txt.split(' ')[0];
-        if (!byDay[date]) byDay[date] = { humidities: [], temps: [], conditions: [] };
+        if (!byDay[date]) byDay[date] = { humidities: [], temps: [], conditions: [], icons: [], descriptions: [] };
         byDay[date].humidities.push(item.main.humidity);
         byDay[date].temps.push(item.main.temp);
         byDay[date].conditions.push(item.weather[0]?.main);
+        byDay[date].icons.push(item.weather[0]?.icon);
+        byDay[date].descriptions.push(item.weather[0]?.description);
       });
 
-      const forecast = Object.entries(byDay).map(([date, vals]) => ({
-        date,
-        avgHumidity: Math.round(vals.humidities.reduce((a, b) => a + b, 0) / vals.humidities.length),
-        minTemp: Math.round(Math.min(...vals.temps)),
-        maxTemp: Math.round(Math.max(...vals.temps)),
-        condition: vals.conditions[Math.floor(vals.conditions.length / 2)],
-      }));
+      const forecast = Object.entries(byDay).map(([date, vals]) => {
+        const mid = Math.floor(vals.conditions.length / 2);
+        return {
+          date,
+          avgHumidity: Math.round(vals.humidities.reduce((a, b) => a + b, 0) / vals.humidities.length),
+          minTemp: Math.round(Math.min(...vals.temps)),
+          maxTemp: Math.round(Math.max(...vals.temps)),
+          condition: vals.conditions[mid],
+          description: vals.descriptions[mid] || '',
+          icon: vals.icons[mid] || '01d',
+        };
+      });
 
       await redisClient.set(cacheKey, { forecast }, CACHE_TTL_FORECAST);
       return { forecast };

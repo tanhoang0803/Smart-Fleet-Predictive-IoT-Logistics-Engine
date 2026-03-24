@@ -4,11 +4,11 @@
 import { useWeather } from '@/hooks/useWeather';
 
 const MULTIPLIER_LABEL = {
-  1.00: { text: 'Normal wear', color: 'text-green-400' },
-  0.90: { text: '+10% wear',   color: 'text-yellow-400' },
-  0.80: { text: '+20% wear',   color: 'text-yellow-500' },
-  0.70: { text: '+30% wear',   color: 'text-orange-400' },
-  0.60: { text: '+40% wear',   color: 'text-red-400' },
+  1.00: { text: 'Normal wear',  color: 'text-emerald-400' },
+  0.90: { text: '+10% wear',    color: 'text-yellow-400' },
+  0.80: { text: '+20% wear',    color: 'text-yellow-500' },
+  0.70: { text: '+30% wear',    color: 'text-orange-400' },
+  0.60: { text: '+40% wear',    color: 'text-red-400' },
 };
 
 function getMultiplierLabel(multiplier) {
@@ -20,7 +20,32 @@ function getMultiplierLabel(multiplier) {
 }
 
 function formatDay(dateStr) {
-  return new Date(dateStr).toLocaleDateString('en-US', { weekday: 'short' });
+  return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' });
+}
+
+function formatFullDate() {
+  return new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+function formatTime(unix) {
+  if (!unix) return '—';
+  return new Date(unix * 1000).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
+
+function titleCase(str) {
+  return str ? str.replace(/\b\w/g, (c) => c.toUpperCase()) : '';
+}
+
+function StatCard({ icon, value, label }) {
+  return (
+    <div className="flex items-center gap-3 bg-white/10 rounded-xl px-4 py-3">
+      <span className="text-2xl leading-none">{icon}</span>
+      <div>
+        <p className="text-sm font-bold text-white leading-tight">{value}</p>
+        <p className="text-xs text-blue-200">{label}</p>
+      </div>
+    </div>
+  );
 }
 
 export function WeatherWidget({ lat, lon }) {
@@ -28,69 +53,111 @@ export function WeatherWidget({ lat, lon }) {
 
   if (loading) {
     return (
-      <div className="bg-fleet-surface border border-fleet-border rounded-xl p-4 animate-pulse">
-        <div className="h-4 bg-fleet-border rounded w-3/4 mb-2" />
-        <div className="h-8 bg-fleet-border rounded w-1/2" />
+      <div className="rounded-2xl overflow-hidden animate-pulse" style={{ background: 'linear-gradient(135deg, #1a3a6b 0%, #2563eb 100%)' }}>
+        <div className="p-6 space-y-4">
+          <div className="h-5 bg-white/10 rounded w-1/3" />
+          <div className="h-16 bg-white/10 rounded w-1/2" />
+          <div className="grid grid-cols-3 gap-3">
+            {[...Array(6)].map((_, i) => <div key={i} className="h-16 bg-white/10 rounded-xl" />)}
+          </div>
+        </div>
       </div>
     );
   }
 
   if (error || !current) {
     return (
-      <div className="bg-fleet-surface border border-fleet-border rounded-xl p-4">
-        <p className="text-fleet-muted text-sm">Weather unavailable</p>
+      <div className="rounded-2xl p-6" style={{ background: 'linear-gradient(135deg, #1a3a6b 0%, #2563eb 100%)' }}>
+        <p className="text-blue-200 text-sm">Weather unavailable</p>
       </div>
     );
   }
 
   const multiplierLabel = getMultiplierLabel(current.humidityMultiplier);
+  const cityLabel = [current.city, current.country].filter(Boolean).join(', ');
+
+  const stats = [
+    { icon: '💧', value: `${current.humidity}%`,                      label: 'Humidity' },
+    { icon: '🌬️', value: `${current.windSpeed ?? '—'} km/h`,          label: 'Wind Speed' },
+    { icon: '👁️',  value: `${current.visibility ?? '—'} km`,          label: 'Visibility' },
+    { icon: '🔵', value: `${current.pressure ?? '—'} hPa`,            label: 'Pressure' },
+    { icon: '🌅', value: formatTime(current.sunrise),                  label: 'Sunrise' },
+    { icon: '🌇', value: formatTime(current.sunset),                   label: 'Sunset' },
+  ];
 
   return (
-    <div className="bg-fleet-surface border border-fleet-border rounded-xl p-4 space-y-3">
-      {/* Current conditions */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-fleet-text">Weather Conditions</h3>
-        <span className="text-xs text-fleet-muted">{current.city}</span>
-      </div>
+    <div className="space-y-3">
 
-      <div className="flex items-center gap-4">
-        {current.icon && (
-          <img
-            src={`https://openweathermap.org/img/wn/${current.icon}@2x.png`}
-            alt={current.condition}
-            className="w-12 h-12"
-          />
-        )}
-        <div>
-          <p className="text-2xl font-bold text-fleet-text">{Math.round(current.temperature)}°C</p>
-          <p className="text-sm text-fleet-muted">{current.condition}</p>
+      {/* Main weather card */}
+      <div className="rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(135deg, #1a3a6b 0%, #1e56c4 100%)' }}>
+        <div className="p-5 space-y-4">
+
+          {/* City + date */}
+          <div>
+            <h3 className="text-lg font-bold text-white">{cityLabel}</h3>
+            <p className="text-sm text-blue-200">{formatFullDate()}</p>
+          </div>
+
+          {/* Temperature + icon */}
+          <div className="flex items-center gap-4">
+            {current.icon && (
+              <img
+                src={`https://openweathermap.org/img/wn/${current.icon}@2x.png`}
+                alt={current.condition}
+                className="w-20 h-20 drop-shadow-lg"
+              />
+            )}
+            <div>
+              <p className="text-6xl font-bold text-white leading-none">{Math.round(current.temperature)}°C</p>
+              <p className="text-base font-semibold text-white mt-1">{titleCase(current.description || current.condition)}</p>
+              {current.feelsLike != null && (
+                <p className="text-sm text-blue-200">Feels like {current.feelsLike}°C</p>
+              )}
+            </div>
+          </div>
+
+          {/* Stats grid 3×2 */}
+          <div className="grid grid-cols-3 gap-2">
+            {stats.map((s) => <StatCard key={s.label} {...s} />)}
+          </div>
+
+          {/* Wear multiplier */}
+          <div className="flex items-center justify-between pt-1 border-t border-white/10">
+            <span className="text-xs text-blue-200">Wear multiplier</span>
+            <span className={`text-xs font-bold ${multiplierLabel.color}`}>
+              ×{current.humidityMultiplier.toFixed(2)} — {multiplierLabel.text}
+            </span>
+          </div>
         </div>
-        <div className="ml-auto text-right">
-          <p className="text-xl font-bold text-fleet-accent">{current.humidity}%</p>
-          <p className="text-xs text-fleet-muted">Humidity</p>
-        </div>
       </div>
 
-      <div className="pt-2 border-t border-fleet-border flex items-center justify-between">
-        <span className="text-xs text-fleet-muted">Wear multiplier</span>
-        <span className={`text-xs font-semibold ${multiplierLabel.color}`}>
-          ×{current.humidityMultiplier.toFixed(2)} — {multiplierLabel.text}
-        </span>
-      </div>
-
-      {/* 5-day forecast */}
+      {/* 5-day forecast card */}
       {forecast && forecast.length > 0 && (
-        <div className="pt-2 border-t border-fleet-border">
-          <p className="text-xs text-fleet-muted mb-2">5-Day Forecast</p>
-          <div className="grid grid-cols-5 gap-1">
-            {forecast.slice(0, 5).map((day, i) => (
-              <div key={i} className="flex flex-col items-center gap-1">
-                <span className="text-xs text-fleet-muted">{formatDay(day.date)}</span>
-                <span className="text-xs text-fleet-muted">{day.condition}</span>
-                <span className="text-xs font-semibold text-fleet-text">{day.maxTemp}°</span>
-                <span className="text-xs text-fleet-accent">{day.avgHumidity}%</span>
-              </div>
-            ))}
+        <div className="rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(135deg, #16305a 0%, #1a4a9e 100%)' }}>
+          <div className="p-5">
+            <p className="text-xs font-bold text-blue-300 uppercase tracking-widest mb-4">5-Day Forecast</p>
+            <div className="grid grid-cols-5 gap-2">
+              {forecast.slice(0, 5).map((day, i) => (
+                <div key={i} className="flex flex-col items-center gap-1 bg-white/10 rounded-xl py-3 px-1">
+                  <span className="text-xs font-semibold text-blue-200">{formatDay(day.date)}</span>
+                  {day.icon ? (
+                    <img
+                      src={`https://openweathermap.org/img/wn/${day.icon}@2x.png`}
+                      alt={day.condition}
+                      className="w-10 h-10"
+                    />
+                  ) : (
+                    <span className="text-2xl">🌤️</span>
+                  )}
+                  <span className="text-xs font-bold text-white text-center leading-tight">
+                    {day.maxTemp}° / {day.minTemp}°
+                  </span>
+                  <span className="text-xs text-blue-200 text-center leading-tight">
+                    {titleCase(day.description || day.condition)}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
