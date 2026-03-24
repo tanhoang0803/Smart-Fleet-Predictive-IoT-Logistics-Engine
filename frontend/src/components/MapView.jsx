@@ -153,18 +153,18 @@ export function MapView({ vehicleId, vehicle }) {
         </form>
 
         {error && <p className="text-red-400 text-xs">{error}</p>}
+      </div>
 
-        {/* Accepted confirmation */}
-        {accepted && (
-          <div className="bg-green-500/10 border border-green-500/40 rounded-lg px-3 py-2">
-            <p className="text-green-400 text-xs font-semibold">✓ Route accepted — mileage updated to {newMileage?.toLocaleString()} km. Maintenance schedule recalculated.</p>
-          </div>
-        )}
+      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+      <div ref={mapRef} style={{ height: '320px', width: '100%' }} />
 
-        {/* Route results */}
-        {routeData && (
-          <>
-            <div className="grid grid-cols-4 gap-2 text-center pt-1">
+      {/* Below-map panel — appears after Optimize Route */}
+      {(routeData || accepted) && (
+        <div className="p-4 border-t border-fleet-border space-y-3">
+
+          {/* Route stats */}
+          {routeData && (
+            <div className="grid grid-cols-4 gap-2 text-center">
               <div>
                 <p className="text-sm font-bold text-fleet-text">{routeData.distanceKm} km</p>
                 <p className="text-xs text-fleet-muted">Distance</p>
@@ -182,16 +182,27 @@ export function MapView({ vehicleId, vehicle }) {
                 <p className="text-xs text-fleet-muted">Fuel est.</p>
               </div>
             </div>
+          )}
 
-            {/* Mileage preview */}
+          {/* Mileage preview */}
+          {routeData && (
             <div className="flex items-center justify-between bg-fleet-bg rounded-lg px-3 py-2 text-xs">
               <span className="text-fleet-muted">Mileage after route</span>
               <span className="text-fleet-text font-semibold">
                 {currentMileage?.toLocaleString()} → <span className="text-fleet-accent">{newMileage?.toLocaleString()} km</span>
               </span>
             </div>
+          )}
 
-            {/* Action buttons */}
+          {/* Accepted confirmation */}
+          {accepted && (
+            <div className="bg-green-500/10 border border-green-500/40 rounded-lg px-3 py-2">
+              <p className="text-green-400 text-xs font-semibold">✓ Route accepted — mileage updated. Maintenance schedule recalculated.</p>
+            </div>
+          )}
+
+          {/* Action buttons */}
+          {routeData && (
             <div className="grid grid-cols-2 gap-2">
               <button onClick={handleRefresh} disabled={loading}
                 className="border border-fleet-border hover:border-fleet-accent text-fleet-muted hover:text-fleet-text text-sm font-semibold rounded-lg py-2 transition-colors disabled:opacity-50">
@@ -202,12 +213,9 @@ export function MapView({ vehicleId, vehicle }) {
                 {accepting ? 'Applying…' : '✓ Accept Route'}
               </button>
             </div>
-          </>
-        )}
-      </div>
-
-      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-      <div ref={mapRef} style={{ height: '320px', width: '100%' }} />
+          )}
+        </div>
+      )}
     </div>
   );
 }
