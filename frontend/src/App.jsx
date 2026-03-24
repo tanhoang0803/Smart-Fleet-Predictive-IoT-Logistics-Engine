@@ -399,7 +399,18 @@ function DashboardPage() {
           </div>
         )}
 
-        {activeTab === 'map' && <MapView />}
+        {activeTab === 'map' && (
+          selected?.vehicle ? (
+            <MapView vehicleId={selected.vehicle.id} vehicle={selected.vehicle} />
+          ) : (
+            <div className="text-center py-16 border border-dashed border-fleet-border rounded-xl">
+              <p className="text-fleet-muted text-sm mb-1">No vehicle selected</p>
+              <p className="text-xs text-fleet-muted opacity-60">
+                Select a vehicle from the <button onClick={() => setActiveTab('fleet')} className="text-fleet-accent hover:underline">Fleet tab</button> first
+              </p>
+            </div>
+          )
+        )}
       </main>
 
       <footer className="border-t border-fleet-border mt-8 py-4 text-center">

@@ -3,6 +3,8 @@
 // Leaflet + OpenStreetMap (free, no API key) + OSRM routing (free public API)
 
 import { useState, useEffect, useRef } from 'react';
+import { useDispatch } from 'react-redux';
+import { fetchVehicleStatus } from '@/redux/fleetSlice';
 import axiosClient from '@/api/axiosClient';
 
 // Leaflet loaded dynamically to avoid SSR issues with Vite
@@ -10,7 +12,8 @@ let L = null;
 
 const HCM_CENTER = [10.7769, 106.7009]; // District 1, Ho Chi Minh City
 
-export function MapView({ vehicleId }) {
+export function MapView({ vehicleId, vehicle }) {
+  const dispatch    = useDispatch();
   const mapRef      = useRef(null);
   const leafletMap  = useRef(null);
   const routeLayer  = useRef(null);
@@ -72,6 +75,9 @@ export function MapView({ vehicleId }) {
       });
       setRouteData(data.data);
 
+      // Refresh maintenance schedule so load factor takes effect immediately
+      if (vehicleId) dispatch(fetchVehicleStatus(vehicleId));
+
       // Draw on map
       if (leafletMap.current && L) {
         if (routeLayer.current) routeLayer.current.remove();
@@ -95,7 +101,14 @@ export function MapView({ vehicleId }) {
   return (
     <div className="bg-fleet-surface border border-fleet-border rounded-xl overflow-hidden">
       <div className="p-4 border-b border-fleet-border">
-        <h3 className="text-sm font-semibold text-fleet-text mb-3">Route Optimizer</h3>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-fleet-text">Route Optimizer</h3>
+          {vehicle && (
+            <span className="text-xs bg-fleet-accent/10 text-fleet-accent border border-fleet-accent/30 rounded-lg px-2 py-1">
+              {vehicle.model} · {vehicle.mileage_current?.toLocaleString()} km
+            </span>
+          )}
+        </div>
         <form onSubmit={handleOptimize} className="flex flex-col gap-2">
           <input className={field} placeholder="Origin (lat,lon) e.g. 10.776,106.700"
             value={origin} onChange={(e) => setOrigin(e.target.value)} />
