@@ -11,6 +11,7 @@ import {
 import {
   fetchFleet, registerVehicle, fetchVehicleStatus, updateMileage, logMaintenance,
   selectAllVehicles, selectFleetLoading, selectSelectedStatus, selectVehicle,
+  selectStatusByVehicleId,
 } from '@/redux/fleetSlice';
 import { AlertBanner } from '@/components/AlertBanner';
 import { FleetCard } from '@/components/FleetCard';
@@ -284,17 +285,23 @@ function RegisterPage() {
 
 // ─── Dashboard Page ───────────────────────────────────────────────────────────
 function DashboardPage() {
-  const dispatch  = useDispatch();
-  const vehicles  = useSelector(selectAllVehicles);
-  const loading   = useSelector(selectFleetLoading);
-  const selected  = useSelector(selectSelectedStatus);
+  const dispatch      = useDispatch();
+  const vehicles      = useSelector(selectAllVehicles);
+  const loading       = useSelector(selectFleetLoading);
+  const selected      = useSelector(selectSelectedStatus);
+  const statusMap     = useSelector(selectStatusByVehicleId);
   const [activeTab, setActiveTab] = useState('fleet');
   const [showAddVehicle, setShowAddVehicle] = useState(false);
   const [showLogMaintenance, setShowLogMaintenance] = useState(false);
   const [showUpdateMileage, setShowUpdateMileage] = useState(false);
   const selectedVehicle = vehicles.find((v) => v.id === selected?.vehicle?.id) || null;
 
-  useEffect(() => { dispatch(fetchFleet()); }, [dispatch]);
+  useEffect(() => {
+    dispatch(fetchFleet()).then((action) => {
+      const items = action.payload?.items || [];
+      items.forEach((v) => dispatch(fetchVehicleStatus(v.id)));
+    });
+  }, [dispatch]);
 
   function handleSelectVehicle(id) {
     dispatch(selectVehicle(id));
@@ -344,7 +351,8 @@ function DashboardPage() {
               <h2 className="text-sm font-semibold text-fleet-muted uppercase tracking-wider">Your Fleet</h2>
               {loading && <p className="text-fleet-muted text-sm">Loading…</p>}
               {vehicles.map((v) => (
-                <FleetCard key={v.id} vehicle={v} alertStatus={v.alert_status}
+                <FleetCard key={v.id} vehicle={v}
+                  alertStatus={statusMap[v.id]?.worstStatus || 'NORMAL'}
                   onSelect={handleSelectVehicle} />
               ))}
               {!loading && !vehicles.length && (
@@ -377,7 +385,7 @@ function DashboardPage() {
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                   {selected.schedule?.map((item) => (
-                    <MaintenanceGauge key={item.component} {...item} />
+                    <MaintenanceGauge key={item.component} {...item} status={item.alertStatus} />
                   ))}
                 </div>
               </div>
