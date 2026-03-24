@@ -14,8 +14,10 @@ if [ ! -f ".env" ]; then
   exit 1
 fi
 
-# Load env for port display
-export $(grep -v '^#' .env | grep -v '^$' | xargs)
+# Load env for port display (safe for multi-line values like FIREBASE_PRIVATE_KEY)
+set -o allexport
+source .env
+set +o allexport
 
 echo "  Frontend → http://localhost:5173"
 echo "  Backend  → http://localhost:${PORT:-3001}"
