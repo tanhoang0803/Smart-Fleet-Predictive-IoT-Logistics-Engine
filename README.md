@@ -36,6 +36,7 @@ Enter origin and destination coordinates to get:
 - **Weather-adjusted load factor** (reduced 10% if rain/storm detected)
 - **Adjusted fuel estimate** (corrected for humidity degradation)
 - **Maintenance warnings** ([CRITICAL] / [WARNING] / [INFO]) based on conditions
+- **Smart destination recommendation** — when the destination doesn't meet maintenance safety thresholds, a nearby service station is surfaced with a "Change to [name]?" button; the user confirms before the route is redrawn (no silent auto-redirect)
 - **Accept Route** automatically updates vehicle mileage and recalculates the full maintenance schedule
 
 ### Location-Aware Weather Widget
@@ -49,6 +50,9 @@ All OpenWeather API calls are intercepted by an Upstash Redis caching layer:
 
 ### Firebase FCM Push Notifications
 Critical and overdue maintenance alerts are delivered via Firebase Cloud Messaging — ensuring drivers receive push notifications even when the app is backgrounded.
+
+### Demo Credentials on Login Page
+A collapsible demo credentials box is displayed below the Sign In form, allowing evaluators to log in instantly with pre-seeded test account details — no registration required for first-time exploration.
 
 ### Session Persistence
 User sessions survive page refresh via `GET /auth/me` — no re-login required. The app shows a spinner until session state is confirmed before making auth routing decisions.
@@ -370,14 +374,30 @@ This project was built using a structured 4-layer AI governance protocol:
 
 ---
 
-## Roadmap
+## Future Improvements
 
-- [ ] Gemini Flash conversational interface for maintenance Q&A
-- [ ] Offline-capable PWA with service worker caching
-- [ ] OBD-II Bluetooth sensor integration (real mileage telemetry)
-- [ ] Multi-vehicle fleet comparison dashboard
-- [ ] Export maintenance history as PDF service record
-- [ ] SMS alerts via Twilio as FCM fallback
+### AI & Intelligence
+- [ ] **Gemini Flash chat interface** — conversational maintenance Q&A ("Is my oil okay this week?") with context from the vehicle's current status and weather
+- [ ] **Predictive failure scoring** — ML model trained on tropical fleet data to estimate failure probability per component, not just interval-based thresholds
+- [ ] **Auto-scheduled maintenance reminders** — calendar integration (Google Calendar / local notification) triggered when status transitions to WARNING
+
+### Hardware & Telemetry
+- [ ] **OBD-II Bluetooth integration** — replace manual mileage entry with real-time odometer polling via Web Bluetooth API
+- [ ] **IoT sensor pipeline** — ingest temperature, vibration, and fuel consumption data from onboard microcontrollers (ESP32 / Raspberry Pi) via MQTT
+
+### Fleet Management
+- [ ] **Multi-vehicle comparison dashboard** — side-by-side wear index, alert status, and cost-per-km across the full fleet
+- [ ] **Export as PDF service record** — printable maintenance history per vehicle for mechanics and insurance purposes
+- [ ] **Fleet cost analytics** — cumulative maintenance spend, saved-repair estimates, and cost trend charts
+
+### Notifications & Reach
+- [ ] **SMS alerts via Twilio** — FCM fallback for drivers without smartphones or backgrounded apps
+- [ ] **Telegram bot integration** — maintenance alerts and quick status queries over chat
+
+### Infrastructure & Reliability
+- [ ] **Offline-capable PWA** — service worker caching for dashboard access without connectivity
+- [ ] **WebSocket live telemetry** — real-time mileage and alert updates without polling
+- [ ] **Multi-region Redis failover** — Upstash geo-replication for Southeast Asian edge deployment
 
 ---
 

@@ -230,6 +230,7 @@ App
 
 ### MapView Behaviour
 - **Optimize Route**: draws route on map, updates WeatherWidget to origin location, shows below-map panel
+- **Destination Recommendation**: if the destination fails maintenance safety thresholds, the nearest suitable station is surfaced as a recommendation with a "Change to [name]?" button — the user must confirm; the destination is NOT auto-changed
 - **↺ Refresh Route**: clears form + map + route panel, resets WeatherWidget to default HCM
 - **✓ Accept Route**: updates vehicle mileage via `updateMileage` thunk, recalculates maintenance via `fetchVehicleStatus`, then clears form + map + resets WeatherWidget to default HCM
 
@@ -453,4 +454,4 @@ Single workflow file: `.github/workflows/ci-deploy.yml`
 
 ---
 
-*Last updated: 2026-03-24 | Authority: L1*
+*Last updated: 2026-03-25 | Authority: L1*

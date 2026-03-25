@@ -227,9 +227,8 @@ export function MapView({ vehicleId, vehicle }) {
           );
           setFindingStation(false);
           if (station) {
+            // Store recommendation — do NOT auto-change destination; user must confirm
             setAdjustedInfo(station);
-            setDest(`${station.lat.toFixed(6)},${station.lon.toFixed(6)}`);
-            drawRoute(oLat, oLon, station.lat, station.lon, `${station.type}: ${station.name}`);
           }
         }
       }
@@ -242,6 +241,21 @@ export function MapView({ vehicleId, vehicle }) {
 
   function handleRefresh() {
     resetToDefault();
+  }
+
+  function handleChangeToRecommended() {
+    if (!adjustedInfo || !origin) return;
+    const [oLat, oLon] = origin.split(',').map(Number);
+    const newDest = `${adjustedInfo.lat.toFixed(6)},${adjustedInfo.lon.toFixed(6)}`;
+    setDest(newDest);
+    drawRoute(oLat, oLon, adjustedInfo.lat, adjustedInfo.lon, `${adjustedInfo.type}: ${adjustedInfo.name}`);
+    // Update routeData distanceKm to reflect new shorter destination
+    if (routeData) {
+      const newDist = +haversineKm(oLat, oLon, adjustedInfo.lat, adjustedInfo.lon).toFixed(1);
+      setRouteData({ ...routeData, distanceKm: newDist });
+    }
+    // Destination changed — clear the recommendation prompt
+    setAdjustedInfo((prev) => ({ ...prev, confirmed: true }));
   }
 
   async function handleAccept() {
@@ -348,24 +362,35 @@ export function MapView({ vehicleId, vehicle }) {
             </div>
           )}
 
-          {/* ── Destination adjusted notification ────────────────────── */}
-          {adjustedInfo && (
-            <div className="border border-blue-500/50 bg-blue-500/10 rounded-xl p-3 space-y-1">
+          {/* ── Destination recommendation notification ───────────────── */}
+          {adjustedInfo && !adjustedInfo.confirmed && (
+            <div className="border border-amber-500/50 bg-amber-500/10 rounded-xl p-3 space-y-2">
               <div className="flex items-center gap-2">
-                <span className="text-blue-400 text-base">📍</span>
-                <p className="text-blue-300 text-xs font-bold uppercase tracking-wide">
-                  Destination Adjusted
+                <span className="text-amber-400 text-base">📍</span>
+                <p className="text-amber-300 text-xs font-bold uppercase tracking-wide">
+                  New Destination Recommended
                 </p>
               </div>
-              <p className="text-blue-200 text-xs">
-                Destination adjusted since does not meet the requirements.
+              <p className="text-amber-200 text-xs">
+                A new destination recommended is <span className="font-semibold">{adjustedInfo.name}</span> — {adjustedInfo.distFromDest} km from your original destination.
               </p>
-              <div className="flex items-center justify-between text-xs pt-1 border-t border-blue-500/20">
-                <span className="text-blue-300 font-semibold">
-                  {adjustedInfo.type}: {adjustedInfo.name}
-                </span>
-                <span className="text-blue-400">{adjustedInfo.distFromDest} km from original destination</span>
+              <div className="flex items-center justify-between text-xs pt-1 border-t border-amber-500/20">
+                <span className="text-amber-300">{adjustedInfo.type} · {adjustedInfo.distFromDest} km away</span>
+                <button
+                  onClick={handleChangeToRecommended}
+                  className="bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold px-3 py-1 rounded-lg transition-colors"
+                >
+                  Change to {adjustedInfo.name}?
+                </button>
               </div>
+            </div>
+          )}
+          {adjustedInfo && adjustedInfo.confirmed && (
+            <div className="border border-green-500/40 bg-green-500/10 rounded-xl p-3 flex items-center gap-2">
+              <span className="text-green-400 text-sm">✓</span>
+              <p className="text-green-300 text-xs font-semibold">
+                Destination changed to {adjustedInfo.type}: {adjustedInfo.name}
+              </p>
             </div>
           )}
 
