@@ -204,14 +204,15 @@ export function MapView({ vehicleId, vehicle }) {
       if (vehicleId) {
         const statusAction = await dispatch(fetchVehicleStatus(vehicleId));
         const schedule = statusAction.payload?.status?.schedule || [];
+        const distKm = result.distanceKm;
 
-        // CRITICAL with 0 < kmRemaining < 10 → "You have to add resources"
-        const addRes = schedule.filter(
-          (s) => s.alertStatus === 'CRITICAL' && s.kmRemaining > 0 && s.kmRemaining < 10
-        );
-        // OVERDUE (kmRemaining <= 0) → "You cannot drive this trip"
+        // Already OVERDUE (kmRemaining <= 0) → "You cannot drive this trip"
         const cannotDrive = schedule.filter(
           (s) => s.alertStatus === 'OVERDUE' || s.kmRemaining <= 0
+        );
+        // Will run out DURING this trip (0 < kmRemaining < distanceKm) → "You have to add resources"
+        const addRes = schedule.filter(
+          (s) => s.kmRemaining > 0 && s.kmRemaining < distKm
         );
 
         setAddResourcesAlerts(addRes);
@@ -339,7 +340,7 @@ export function MapView({ vehicleId, vehicle }) {
                       {COMPONENT_LABELS[s.component] ?? s.component}
                     </span>
                     <span className="text-orange-400 font-bold">
-                      You have to add resources · {s.kmRemaining} km left
+                      You have to add resources · {s.kmRemaining} km left (trip: {routeData?.distanceKm} km)
                     </span>
                   </div>
                 ))}

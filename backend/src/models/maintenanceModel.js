@@ -1,7 +1,7 @@
 // Smart-Fleet IoT — Maintenance Model
 // TanQHoang © 2026
 
-const { supabase } = require('../utils/supabaseClient');
+const { supabase, supabaseAdmin } = require('../utils/supabaseClient');
 
 const maintenanceModel = {
   // ─── Logs ─────────────────────────────────────────────────────────────────
@@ -23,7 +23,8 @@ const maintenanceModel = {
   },
 
   async createLog({ vehicleId, component, mileageAtService, notes }) {
-    const { data, error } = await supabase
+    // Use admin client: INSERT requires WITH CHECK policy; auth is enforced by authMiddleware
+    const { data, error } = await supabaseAdmin
       .from('maintenance_logs')
       .insert({ vehicle_id: vehicleId, component, mileage_at_service: mileageAtService, notes })
       .select('id, component, mileage_at_service, notes, created_at')
