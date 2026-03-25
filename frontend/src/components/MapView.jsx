@@ -38,12 +38,13 @@ function haversineKm(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// Query Overpass API for nearest gas station or repair shop within 10 km
-async function findNearestServiceStation(lat, lon) {
+// Query Overpass API for nearest gas station or repair shop near destination.
+// Station must be >= 0.1 km from origin (real reachable location).
+async function findNearestServiceStation(destLat, destLon, originLat, originLon) {
   const query = `[out:json][timeout:15];(
-    node["amenity"="fuel"](around:10000,${lat},${lon});
-    node["shop"="car_repair"](around:10000,${lat},${lon});
-    node["amenity"="car_repair"](around:10000,${lat},${lon});
+    node["amenity"="fuel"](around:10000,${destLat},${destLon});
+    node["shop"="car_repair"](around:10000,${destLat},${destLon});
+    node["amenity"="car_repair"](around:10000,${destLat},${destLon});
   );out body;`;
   try {
     const res = await fetch(
@@ -61,10 +62,13 @@ async function findNearestServiceStation(lat, lon) {
           lon: e.lon,
           name: e.tags?.name || (isGas ? 'Gas Station' : 'Repair Shop'),
           type: isGas ? 'Gas Station' : 'Repair Shop',
-          dist: +haversineKm(lat, lon, e.lat, e.lon).toFixed(2),
+          distFromDest: +haversineKm(destLat, destLon, e.lat, e.lon).toFixed(2),
+          distFromOrigin: +haversineKm(originLat, originLon, e.lat, e.lon).toFixed(2),
         };
       })
-      .sort((a, b) => a.dist - b.dist)[0];
+      // Must be at least 0.1 km from origin (real destination, not trivially same spot)
+      .filter((e) => e.distFromOrigin >= 0.1)
+      .sort((a, b) => a.distFromDest - b.distFromDest)[0];
 
     return nearest || null;
   } catch {
@@ -87,11 +91,15 @@ export function MapView({ vehicleId, vehicle }) {
   const [accepted, setAccepted]         = useState(false);
   const [error, setError]               = useState(null);
 
+  // Store original dest coords so we can search near them even after dest field changes
+  const originalDestRef = useRef(null);
+
   // Maintenance alert state
-  const [maintenanceAlerts, setMaintenanceAlerts] = useState([]);  // CRITICAL<10 or OVERDUE items
-  const [overdueBlocked, setOverdueBlocked]       = useState(false); // any OVERDUE → Accept blocked
-  const [adjustedInfo, setAdjustedInfo]           = useState(null);  // { name, type, lat, lon, dist }
-  const [findingStation, setFindingStation]       = useState(false);
+  const [addResourcesAlerts, setAddResourcesAlerts] = useState([]); // CRITICAL, 0 < km < 10
+  const [cannotDriveAlerts, setCannotDriveAlerts]   = useState([]); // OVERDUE, km <= 0
+  const [overdueBlocked, setOverdueBlocked]         = useState(false);
+  const [adjustedInfo, setAdjustedInfo]             = useState(null);
+  const [findingStation, setFindingStation]         = useState(false);
 
   // Current mileage from Redux (stays fresh after updates)
   const currentMileage = statusMap[vehicleId]?.vehicle?.mileage_current ?? vehicle?.mileage_current ?? 0;
@@ -161,9 +169,11 @@ export function MapView({ vehicleId, vehicle }) {
     setRouteData(null);
     setAccepted(false);
     setError(null);
-    setMaintenanceAlerts([]);
+    setAddResourcesAlerts([]);
+    setCannotDriveAlerts([]);
     setOverdueBlocked(false);
     setAdjustedInfo(null);
+    originalDestRef.current = null;
     if (routeLayer.current) { routeLayer.current.remove(); routeLayer.current = null; }
     if (leafletMap.current) leafletMap.current.setView(HCM_CENTER, 13);
     dispatch(setRouteLocation(null));
@@ -176,9 +186,15 @@ export function MapView({ vehicleId, vehicle }) {
     setLoading(true);
     setError(null);
     setAccepted(false);
-    setMaintenanceAlerts([]);
+    setAddResourcesAlerts([]);
+    setCannotDriveAlerts([]);
     setOverdueBlocked(false);
     setAdjustedInfo(null);
+
+    // Capture original destination coords before any auto-adjustment
+    const [oLat, oLon] = origin.split(',').map(Number);
+    const [dLat, dLon] = destination.split(',').map(Number);
+    originalDestRef.current = { lat: dLat, lon: dLon };
 
     try {
       const result = await optimize();
@@ -186,29 +202,32 @@ export function MapView({ vehicleId, vehicle }) {
       updateWeatherForOrigin();
 
       if (vehicleId) {
-        // Await status so we can read schedule immediately
         const statusAction = await dispatch(fetchVehicleStatus(vehicleId));
         const schedule = statusAction.payload?.status?.schedule || [];
 
-        // Collect alerts: OVERDUE or CRITICAL with < 10 km remaining
-        const alerts = schedule.filter(
-          (s) => s.alertStatus === 'OVERDUE' ||
-                 (s.alertStatus === 'CRITICAL' && s.kmRemaining < 10)
+        // CRITICAL with 0 < kmRemaining < 10 → "You have to add resources"
+        const addRes = schedule.filter(
+          (s) => s.alertStatus === 'CRITICAL' && s.kmRemaining > 0 && s.kmRemaining < 10
         );
-        setMaintenanceAlerts(alerts);
+        // OVERDUE (kmRemaining <= 0) → "You cannot drive this trip"
+        const cannotDrive = schedule.filter(
+          (s) => s.alertStatus === 'OVERDUE' || s.kmRemaining <= 0
+        );
 
-        // Check for OVERDUE items → block Accept + auto-adjust destination
-        const overdueItems = alerts.filter((s) => s.alertStatus === 'OVERDUE');
-        if (overdueItems.length > 0) {
+        setAddResourcesAlerts(addRes);
+        setCannotDriveAlerts(cannotDrive);
+
+        if (cannotDrive.length > 0) {
           setOverdueBlocked(true);
           setFindingStation(true);
-          const [oLat, oLon] = origin.split(',').map(Number);
-          const station = await findNearestServiceStation(oLat, oLon);
+          // Find service station near the ORIGINAL destination (not origin)
+          const station = await findNearestServiceStation(
+            dLat, dLon, oLat, oLon
+          );
           setFindingStation(false);
           if (station) {
             setAdjustedInfo(station);
-            const newDest = `${station.lat.toFixed(6)},${station.lon.toFixed(6)}`;
-            setDest(newDest);
+            setDest(`${station.lat.toFixed(6)},${station.lon.toFixed(6)}`);
             drawRoute(oLat, oLon, station.lat, station.lon, `${station.type}: ${station.name}`);
           }
         }
@@ -245,9 +264,6 @@ export function MapView({ vehicleId, vehicle }) {
   const w = routeData?.weather;
   const conditionIcon = w ? (CONDITION_ICON[w.condition] ?? CONDITION_ICON.default) : null;
 
-  // Separate OVERDUE from near-critical for display
-  const overdueAlerts  = maintenanceAlerts.filter((s) => s.alertStatus === 'OVERDUE');
-  const criticalAlerts = maintenanceAlerts.filter((s) => s.alertStatus === 'CRITICAL');
 
   return (
     <div className="bg-fleet-surface border border-fleet-border rounded-xl overflow-hidden">
@@ -285,47 +301,45 @@ export function MapView({ vehicleId, vehicle }) {
       {(routeData || accepted) && (
         <div className="p-4 border-t border-fleet-border space-y-3">
 
-          {/* ── OVERDUE BLOCK alert ───────────────────────────────────── */}
-          {overdueBlocked && overdueAlerts.length > 0 && (
+          {/* ── OVERDUE: "You cannot drive this trip" ─────────────────── */}
+          {cannotDriveAlerts.length > 0 && (
             <div className="border border-red-500/60 bg-red-500/10 rounded-xl p-3 space-y-2">
               <div className="flex items-center gap-2">
                 <span className="text-red-400 text-base">🚫</span>
                 <p className="text-red-400 text-xs font-bold uppercase tracking-wide">
-                  Accept Route Blocked — Immediate Service Required
+                  You Cannot Drive This Trip
                 </p>
               </div>
-              <div className="space-y-1">
-                {overdueAlerts.map((s) => (
-                  <div key={s.component} className="flex items-center justify-between text-xs">
+              <div className="space-y-1.5">
+                {cannotDriveAlerts.map((s) => (
+                  <div key={s.component} className="flex items-center justify-between text-xs bg-red-500/10 rounded-lg px-2 py-1.5">
                     <span className="text-red-300 font-semibold">
                       {COMPONENT_LABELS[s.component] ?? s.component}
                     </span>
-                    <span className="text-red-400 font-bold">
-                      OVERDUE · {Math.abs(s.kmDue - (currentMileage))} km past service
-                    </span>
+                    <span className="text-red-400 font-bold">You cannot drive this trip</span>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* ── CRITICAL < 10 km alert ───────────────────────────────── */}
-          {criticalAlerts.length > 0 && (
+          {/* ── CRITICAL < 10 km: "You have to add resources" ─────────── */}
+          {addResourcesAlerts.length > 0 && (
             <div className="border border-orange-500/50 bg-orange-500/10 rounded-xl p-3 space-y-2">
               <div className="flex items-center gap-2">
                 <span className="text-orange-400 text-base">⚠️</span>
                 <p className="text-orange-400 text-xs font-bold uppercase tracking-wide">
-                  Critical Maintenance — Service Before Departure
+                  Critical — Add Resources Before Departure
                 </p>
               </div>
-              <div className="space-y-1">
-                {criticalAlerts.map((s) => (
-                  <div key={s.component} className="flex items-center justify-between text-xs">
+              <div className="space-y-1.5">
+                {addResourcesAlerts.map((s) => (
+                  <div key={s.component} className="flex items-center justify-between text-xs bg-orange-500/10 rounded-lg px-2 py-1.5">
                     <span className="text-orange-300 font-semibold">
                       {COMPONENT_LABELS[s.component] ?? s.component}
                     </span>
                     <span className="text-orange-400 font-bold">
-                      {s.kmRemaining} km remaining
+                      You have to add resources · {s.kmRemaining} km left
                     </span>
                   </div>
                 ))}
@@ -343,13 +357,13 @@ export function MapView({ vehicleId, vehicle }) {
                 </p>
               </div>
               <p className="text-blue-200 text-xs">
-                Destination adjusted since vehicle does not meet route requirements.
+                Destination adjusted since does not meet the requirements.
               </p>
               <div className="flex items-center justify-between text-xs pt-1 border-t border-blue-500/20">
                 <span className="text-blue-300 font-semibold">
                   {adjustedInfo.type}: {adjustedInfo.name}
                 </span>
-                <span className="text-blue-400">{adjustedInfo.dist} km away</span>
+                <span className="text-blue-400">{adjustedInfo.distFromDest} km from original destination</span>
               </div>
             </div>
           )}
