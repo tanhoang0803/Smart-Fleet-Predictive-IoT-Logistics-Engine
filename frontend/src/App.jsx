@@ -228,6 +228,17 @@ function LoginPage() {
             {loading ? 'Signing in…' : 'Sign In'}
           </button>
         </form>
+        <div className="mt-4 rounded-lg border border-fleet-accent/40 bg-fleet-accent/5 px-4 py-3 space-y-2">
+          <p className="text-xs text-fleet-accent font-semibold uppercase tracking-wide">Demo credentials</p>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-fleet-muted">Email</span>
+            <span className="text-fleet-text font-mono">demo@smartfleet.io</span>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-fleet-muted">Password</span>
+            <span className="text-fleet-text font-mono">demo1234</span>
+          </div>
+        </div>
         <p className="text-xs text-fleet-muted text-center mt-4">
           No account? <a href="/register" className="text-fleet-accent hover:underline">Register</a>
         </p>
