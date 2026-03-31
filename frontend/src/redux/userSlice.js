@@ -60,6 +60,7 @@ const userSlice = createSlice({
         state.loading = false;
         state.profile = action.payload;
         state.isAuthenticated = true;
+        state.initialized = true;
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
