@@ -6,7 +6,22 @@
 **Stack:** React · Redux Toolkit · Node.js · Express · Supabase · Upstash Redis · Docker
 **Optimized for:** Honda Wave RSX · Ho Chi Minh City tropical climate · E10 fuel blend
 
-[![CI/CD — Lint, Test, Build & Deploy](https://github.com/tanhoang0803/Smart-Fleet-Predictive-IoT-Logistics-Engine/actions/workflows/ci-deploy.yml/badge.svg)](https://github.com/tanhoang0803/Smart-Fleet-Predictive-IoT-Logistics-Engine/actions/workflows/ci-deploy.yml)
+---
+
+## Status & Stack
+
+[![CI](https://github.com/tanhoang0803/Smart-Fleet-Predictive-IoT-Logistics-Engine/actions/workflows/ci-deploy.yml/badge.svg)](https://github.com/tanhoang0803/Smart-Fleet-Predictive-IoT-Logistics-Engine/actions/workflows/ci-deploy.yml)
+![Deployed](https://img.shields.io/badge/Deployed-Vercel-black?logo=vercel&logoColor=white)
+![Backend](https://img.shields.io/badge/Deployed-Render-46E3B7?logo=render&logoColor=white)
+
+![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
+![Redux](https://img.shields.io/badge/Redux_Toolkit-2.x-764ABC?logo=redux&logoColor=white)
+![Node.js](https://img.shields.io/badge/Node.js-24-339933?logo=node.js&logoColor=white)
+![Express](https://img.shields.io/badge/Express-4.x-000000?logo=express&logoColor=white)
+![Supabase](https://img.shields.io/badge/DB-Supabase-3ECF8E?logo=supabase&logoColor=white)
+![Redis](https://img.shields.io/badge/Cache-Upstash_Redis-DC382D?logo=redis&logoColor=white)
+![Docker](https://img.shields.io/badge/Container-Docker-2496ED?logo=docker&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/CI-GitHub_Actions-2088FF?logo=github-actions&logoColor=white)
 
 ---
 
